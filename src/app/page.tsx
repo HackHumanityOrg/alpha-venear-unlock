@@ -1,65 +1,132 @@
-import Image from "next/image";
+"use client";
+
+import { WalletProvider, useWallet } from "@/contexts/WalletContext";
+import { useVenearContract } from "@/hooks/useVenearContract";
+import { WalletConnection } from "@/components/WalletConnection";
+import { VenearBalance } from "@/components/VenearBalance";
+import { UnlockActions } from "@/components/UnlockActions";
+import { PublicAccountsList } from "@/components/PublicAccountsList";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+function AppContent() {
+  const { accountId } = useWallet();
+  const {
+    lockedBalance,
+    pendingBalance,
+    unlockTimestamp,
+    lockupAccountId,
+    lockupNotCreated,
+    loading,
+    error,
+    beginUnlock,
+    endUnlock,
+  } = useVenearContract();
+
+  return (
+    <div className="min-h-screen bg-background p-4">
+      <div className="container max-w-7xl mx-auto space-y-6">
+        <div className="text-center space-y-2 py-4">
+          <h1 className="text-4xl font-bold">veNEAR Unlock</h1>
+          <p className="text-muted-foreground">
+            Manage your locked veNEAR tokens from v.voteagora.near
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="space-y-6">
+            <WalletConnection />
+
+            {accountId && (
+              <>
+                <VenearBalance
+                  lockedBalance={lockedBalance}
+                  pendingBalance={pendingBalance}
+                  unlockTimestamp={unlockTimestamp}
+                  lockupAccountId={lockupAccountId}
+                  lockupNotCreated={lockupNotCreated}
+                  error={error}
+                />
+
+                <UnlockActions
+                  lockedBalance={lockedBalance}
+                  pendingBalance={pendingBalance}
+                  unlockTimestamp={unlockTimestamp}
+                  loading={loading}
+                  error={error}
+                  onBeginUnlock={beginUnlock}
+                  onEndUnlock={endUnlock}
+                />
+              </>
+            )}
+          </div>
+
+          <div className="min-h-screen">
+            <PublicAccountsList />
+          </div>
+        </div>
+      </div>
+
+      <footer className="sticky bottom-0 bg-background border-t border-border/50 py-2 mt-8">
+        <div className="flex items-center justify-end gap-4 px-6">
+          <a
+            href="https://hackhumanity.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] font-medium text-muted-foreground/70 hover:text-muted-foreground transition-all tracking-wide uppercase"
+          >
+            Powered by HackHumanity
+          </a>
+          <span className="text-muted-foreground/50 mx-1">·</span>
+          <a
+            href="https://github.com/HackHumanityOrg"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground/70 hover:text-muted-foreground transition-all hover:scale-110"
+            aria-label="GitHub"
+          >
+            <svg
+              width="16"
+              height="16"
+              role="img"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+            >
+              <title>GitHub</title>
+              <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+            </svg>
+          </a>
+          <a
+            href="https://x.com/HackHumanityCo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground/70 hover:text-muted-foreground transition-all hover:scale-110"
+            aria-label="X (Twitter)"
+          >
+            <svg
+              width="16"
+              height="16"
+              role="img"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+            >
+              <title>X</title>
+              <path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z" />
+            </svg>
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <ErrorBoundary>
+      <WalletProvider>
+        <AppContent />
+      </WalletProvider>
+    </ErrorBoundary>
   );
 }
