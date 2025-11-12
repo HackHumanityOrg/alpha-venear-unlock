@@ -41,7 +41,6 @@ interface AccountInfo {
 export interface PublicAccount {
   accountId: string;
   lockedNear: string;
-  rawBalance: Big;
   lockupAccountId: string;
   pendingBalance: string;
   unlockTimestamp: string | null;
@@ -100,7 +99,6 @@ export function usePublicVenearAccounts() {
       const processedAccounts = await Promise.all(
         allAccounts.map(async (item) => {
           const acc = item.account;
-          const nearBalance = Big(acc.balance.near_balance);
 
           try {
             const lockupIdResult = await provider.query({
@@ -117,6 +115,7 @@ export function usePublicVenearAccounts() {
               Buffer.from((lockupIdResult as unknown as QueryResult).result).toString(),
             );
 
+            let locked = "0";
             let pending = "0";
             let timestamp = null;
             let lockupNotCreated = false;
@@ -127,7 +126,14 @@ export function usePublicVenearAccounts() {
               lockupNotCreated = true;
             } else {
               try {
-                const [pendingResult, timestampResult] = await Promise.allSettled([
+                const [lockedResult, pendingResult, timestampResult] = await Promise.allSettled([
+                  provider.query({
+                    request_type: "call_function",
+                    finality: "final",
+                    account_id: lockupId,
+                    method_name: "get_venear_locked_balance",
+                    args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+                  }),
                   provider.query({
                     request_type: "call_function",
                     finality: "final",
@@ -143,6 +149,12 @@ export function usePublicVenearAccounts() {
                     args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
                   }),
                 ]);
+
+                if (lockedResult.status === "fulfilled") {
+                  locked = JSON.parse(
+                    Buffer.from((lockedResult.value as unknown as QueryResult).result).toString(),
+                  );
+                }
 
                 if (pendingResult.status === "fulfilled") {
                   pending = JSON.parse(
@@ -162,10 +174,10 @@ export function usePublicVenearAccounts() {
               }
             }
 
+            const lockedBalance = Big(locked);
             return {
               accountId: acc.account_id,
-              lockedNear: nearBalance.div(Big(10).pow(24)).toFixed(2),
-              rawBalance: nearBalance,
+              lockedNear: lockedBalance.div(Big(10).pow(24)).toFixed(2),
               lockupAccountId: lockupId,
               pendingBalance: Big(pending).div(Big(10).pow(24)).toFixed(2),
               unlockTimestamp: timestamp,
@@ -179,7 +191,9 @@ export function usePublicVenearAccounts() {
       );
 
       const validAccounts = processedAccounts.filter((acc) => acc !== null) as PublicAccount[];
-      const sorted = validAccounts.sort((a, b) => b.rawBalance.cmp(a.rawBalance));
+      const sorted = validAccounts.sort(
+        (a, b) => parseFloat(b.lockedNear) - parseFloat(a.lockedNear),
+      );
       setAccounts(sorted);
     } catch (err) {
       console.error("Failed to fetch public accounts:", err);
