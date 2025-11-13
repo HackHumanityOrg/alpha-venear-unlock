@@ -540,20 +540,23 @@ export function useVenearContract() {
   }, [selector, accountId, lockupAccountId, stakingPoolInfo, fetchBalances]);
 
   const transferToAccount = useCallback(
-    async (amount: string, receiverId?: string) => {
+    async (amountYocto: string, receiverId?: string) => {
       if (!selector || !accountId || !lockupAccountId)
         throw new Error("Wallet not connected or lockup account not loaded");
 
-      const amountNum = parseFloat(amount);
-      if (isNaN(amountNum) || amountNum <= 0) {
-        throw new Error("Invalid amount: must be a positive number");
-      }
-
-      const liquidNum = parseFloat(formatNearAmount(balance.liquid || "0"));
-      if (amountNum > liquidNum) {
-        throw new Error(
-          `Amount exceeds liquid balance of ${formatNearAmount(balance.liquid || "0")} NEAR`,
-        );
+      // Validate the yocto amount
+      try {
+        const amountBig = Big(amountYocto);
+        if (amountBig.lte(0)) {
+          throw new Error("Invalid amount: must be greater than zero");
+        }
+        if (amountBig.gt(Big(balance.liquid || "0"))) {
+          throw new Error(
+            `Amount exceeds liquid balance of ${formatNearAmount(balance.liquid || "0")} NEAR`,
+          );
+        }
+      } catch {
+        throw new Error("Invalid amount format");
       }
 
       const recipient = receiverId || accountId;
@@ -570,7 +573,7 @@ export function useVenearContract() {
             actionCreators.functionCall(
               "transfer",
               {
-                amount: parseNearAmount(amount),
+                amount: amountYocto,
                 receiver_id: recipient,
               },
               MAX_GAS,
@@ -594,28 +597,30 @@ export function useVenearContract() {
   const getStakingStatus = useCallback((): StakingStatus => {
     if (!stakingPoolInfo.stakingPoolId) return "not_staked";
 
-    const stakedNum = parseFloat(formatNearAmount(stakingPoolInfo.stakedBalance));
-    const unstakedNum = parseFloat(formatNearAmount(stakingPoolInfo.unstakedBalance));
+    const staked = Big(stakingPoolInfo.stakedBalance);
+    const unstaked = Big(stakingPoolInfo.unstakedBalance);
 
-    if (stakedNum > 0) return "staked";
+    if (staked.gt(0)) return "staked";
     if (stakingPoolInfo.isUnstaking) return "unstaking";
-    if (unstakedNum > 0) return "unstaked";
+    if (unstaked.gt(0)) return "unstaked";
 
     return "not_staked";
   }, [stakingPoolInfo]);
 
   return {
-    lockedBalance: formatNearAmount(balance.locked),
-    pendingBalance: formatNearAmount(balance.pending),
-    liquidBalance: formatNearAmount(balance.liquid || "0"),
-    accountBalance: formatNearAmount(balance.accountBalance || "0"),
+    lockedBalance: balance.locked,
+    pendingBalance: balance.pending,
+    liquidBalance: balance.liquid || "0",
+    accountBalance: balance.accountBalance || "0",
     unlockTimestamp: balance.unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
     stakingPoolInfo: {
-      ...stakingPoolInfo,
-      stakedBalance: formatNearAmount(stakingPoolInfo.stakedBalance),
-      unstakedBalance: formatNearAmount(stakingPoolInfo.unstakedBalance),
+      stakingPoolId: stakingPoolInfo.stakingPoolId,
+      stakedBalance: stakingPoolInfo.stakedBalance,
+      unstakedBalance: stakingPoolInfo.unstakedBalance,
+      canWithdraw: stakingPoolInfo.canWithdraw,
+      isUnstaking: stakingPoolInfo.isUnstaking,
     },
     stakingStatus: getStakingStatus(),
     loading,

@@ -5,8 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { isUnlockReady } from "@/lib/timeUtils";
+import Big from "big.js";
 
 import type { StakingStatus } from "@/types/venear";
+
+const formatNearAmount = (yoctoAmount: string): string => {
+  try {
+    return Big(yoctoAmount).div(Big(10).pow(24)).toFixed(4);
+  } catch {
+    return "0";
+  }
+};
 
 interface UnlockActionsProps {
   lockedBalance: string;
@@ -23,7 +32,7 @@ interface UnlockActionsProps {
   onEndUnlock: () => Promise<void>;
   onUnstake?: () => Promise<void>;
   onWithdrawFromPool?: () => Promise<void>;
-  onTransfer?: (amount: string) => Promise<void>;
+  onTransfer?: (amountYocto: string) => Promise<void>;
 }
 
 export function UnlockActions({
@@ -47,11 +56,11 @@ export function UnlockActions({
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
 
-  const hasLocked = parseFloat(lockedBalance) > 0;
-  const hasPending = parseFloat(pendingBalance) > 0;
-  const hasLiquid = parseFloat(liquidBalance) > 0;
-  const hasStaked = parseFloat(stakedBalance) > 0;
-  const hasUnstaked = parseFloat(unstakedBalance) > 0;
+  const hasLocked = Big(lockedBalance).gt(0);
+  const hasPending = Big(pendingBalance).gt(0);
+  const hasLiquid = Big(liquidBalance || "0").gt(0);
+  const hasStaked = Big(stakedBalance || "0").gt(0);
+  const hasUnstaked = Big(unstakedBalance || "0").gt(0);
   const hasUnlockPending = unlockTimestamp && unlockTimestamp !== "0";
 
   // Derive canWithdraw directly from unlockTimestamp during render
@@ -104,8 +113,8 @@ export function UnlockActions({
     try {
       setActionError(null);
       setShowTransferConfirm(false);
-      // Transfer all liquid balance to user's account
-      await onTransfer(liquidBalance);
+      // Transfer all liquid balance to user's account (using yocto amount to avoid rounding)
+      await onTransfer(liquidBalance || "0");
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Failed to transfer");
     }
@@ -130,8 +139,8 @@ export function UnlockActions({
               <div className="space-y-3">
                 <p className="font-semibold">Staking Pool Action Required</p>
                 <p className="text-sm">
-                  You have {stakedBalance} NEAR staked. You must unstake before completing the
-                  unlock process.
+                  You have {formatNearAmount(stakedBalance || "0")} NEAR staked. You must unstake before
+                  completing the unlock process.
                 </p>
                 <Button
                   onClick={handleUnstake}
@@ -140,7 +149,7 @@ export function UnlockActions({
                   size="sm"
                   className="w-full"
                 >
-                  {loading ? "Processing..." : `Unstake ${stakedBalance} NEAR`}
+                  {loading ? "Processing..." : `Unstake ${formatNearAmount(stakedBalance || "0")} NEAR`}
                 </Button>
                 <p className="text-xs text-muted-foreground">
                   Note: After unstaking, you&apos;ll need to wait 2-4 epochs (12-24 hours) before
@@ -157,8 +166,8 @@ export function UnlockActions({
               <div className="space-y-3">
                 <p className="font-semibold">Withdraw from Staking Pool</p>
                 <p className="text-sm">
-                  You have {unstakedBalance} NEAR unstaked and ready to withdraw from the staking
-                  pool.
+                  You have {formatNearAmount(unstakedBalance || "0")} NEAR unstaked and ready to withdraw
+                  from the staking pool.
                 </p>
                 <Button
                   onClick={handleWithdrawFromPool}
@@ -167,7 +176,7 @@ export function UnlockActions({
                   size="sm"
                   className="w-full"
                 >
-                  {loading ? "Processing..." : `Withdraw ${unstakedBalance} NEAR`}
+                  {loading ? "Processing..." : `Withdraw ${formatNearAmount(unstakedBalance || "0")} NEAR`}
                 </Button>
               </div>
             </AlertDescription>
@@ -215,7 +224,7 @@ export function UnlockActions({
                         <Button
                           onClick={handleBeginUnlock}
                           disabled={loading}
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
                         >
                           {loading ? "Processing..." : "Yes, Begin Unlock"}
@@ -272,7 +281,7 @@ export function UnlockActions({
                   variant="secondary"
                   size="lg"
                 >
-                  Transfer {liquidBalance} NEAR to My Account
+                  Transfer {formatNearAmount(liquidBalance || "0")} NEAR to My Account
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   Transfer unlocked NEAR from lockup contract to your account
@@ -284,7 +293,9 @@ export function UnlockActions({
                   <AlertDescription>
                     <div className="space-y-3">
                       <p className="font-semibold">Confirm Transfer</p>
-                      <p className="text-sm">Transfer {liquidBalance} NEAR to your account?</p>
+                      <p className="text-sm">
+                        Transfer {formatNearAmount(liquidBalance || "0")} NEAR to your account?
+                      </p>
                       <div className="flex gap-2">
                         <Button
                           onClick={handleTransfer}

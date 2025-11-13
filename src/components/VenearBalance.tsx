@@ -4,8 +4,17 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateTimeRemaining } from "@/lib/timeUtils";
+import Big from "big.js";
 
 import type { StakingStatus } from "@/types/venear";
+
+const formatNearAmount = (yoctoAmount: string): string => {
+  try {
+    return Big(yoctoAmount).div(Big(10).pow(24)).toFixed(4);
+  } catch {
+    return "0";
+  }
+};
 
 interface VenearBalanceProps {
   lockedBalance: string;
@@ -65,11 +74,11 @@ export function VenearBalance({
     return () => clearInterval(interval);
   }, [unlockTimestamp]);
 
-  const hasLocked = parseFloat(lockedBalance) > 0;
-  const hasPending = parseFloat(pendingBalance) > 0;
-  const hasLiquid = parseFloat(liquidBalance || "0") > 0;
-  const hasStaked = parseFloat(stakedBalance) > 0;
-  const hasUnstaked = parseFloat(unstakedBalance) > 0;
+  const hasLocked = Big(lockedBalance).gt(0);
+  const hasPending = Big(pendingBalance).gt(0);
+  const hasLiquid = Big(liquidBalance || "0").gt(0);
+  const hasStaked = Big(stakedBalance || "0").gt(0);
+  const hasUnstaked = Big(unstakedBalance || "0").gt(0);
   const hasAnyBalance = hasLocked || hasPending || hasLiquid;
   const isLockupContractError = error?.includes("may not exist");
 
@@ -135,7 +144,8 @@ export function VenearBalance({
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground font-medium">Locked Balance</p>
           <p className="text-3xl font-bold">
-            {lockedBalance} <span className="text-xl text-muted-foreground">veNEAR</span>
+            {formatNearAmount(lockedBalance)}{" "}
+            <span className="text-xl text-muted-foreground">veNEAR</span>
           </p>
           {!hasLocked && !isLockupContractError && (
             <p className="text-sm text-muted-foreground">No locked veNEAR balance found</p>
@@ -146,7 +156,8 @@ export function VenearBalance({
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground font-medium">Pending Unlock</p>
             <p className="text-2xl font-semibold">
-              {pendingBalance} <span className="text-lg text-muted-foreground">veNEAR</span>
+              {formatNearAmount(pendingBalance)}{" "}
+              <span className="text-lg text-muted-foreground">veNEAR</span>
             </p>
           </div>
         )}
@@ -155,7 +166,8 @@ export function VenearBalance({
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground font-medium">Liquid Balance</p>
             <p className="text-2xl font-semibold">
-              {liquidBalance} <span className="text-lg text-muted-foreground">NEAR</span>
+              {formatNearAmount(liquidBalance || "0")}{" "}
+              <span className="text-lg text-muted-foreground">NEAR</span>
             </p>
             <p className="text-xs text-muted-foreground">Available to transfer to your account</p>
           </div>
@@ -175,14 +187,14 @@ export function VenearBalance({
             {hasStaked && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Staked Balance</p>
-                <p className="text-lg font-semibold">{stakedBalance} NEAR</p>
+                <p className="text-lg font-semibold">{formatNearAmount(stakedBalance || "0")} NEAR</p>
               </div>
             )}
 
             {hasUnstaked && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Unstaked Balance</p>
-                <p className="text-lg font-semibold">{unstakedBalance} NEAR</p>
+                <p className="text-lg font-semibold">{formatNearAmount(unstakedBalance || "0")} NEAR</p>
                 <p className="text-xs text-muted-foreground">
                   {stakingStatus === "unstaking"
                     ? "Wait 2-4 epochs (12-24 hours) before withdrawing"
