@@ -3,6 +3,9 @@
 import { usePublicVenearAccounts } from "@/hooks/usePublicVenearAccounts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { calculateTimeRemaining } from "@/lib/timeUtils";
 
 function getTimeRemaining(unlockTimestamp: string | null): string {
@@ -24,17 +27,30 @@ function getStatus(
   lockedNear: string,
   pendingBalance: string,
   unlockTimestamp: string | null,
-): string {
+): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } {
   const locked = parseFloat(lockedNear);
   const pending = parseFloat(pendingBalance);
 
   if (pending > 0 && unlockTimestamp && unlockTimestamp !== "0") {
-    return "Unlocking";
+    return { label: "Unlocking", variant: "default" };
   } else if (locked > 0) {
-    return "Locked";
+    return { label: "Locked", variant: "secondary" };
   } else {
-    return "No balance";
+    return { label: "No balance", variant: "outline" };
   }
+}
+
+function calculateUnlockProgress(unlockTimestamp: string | null): number {
+  if (!unlockTimestamp || unlockTimestamp === "0") return 0;
+
+  const UNLOCK_PERIOD_NS = 91.25 * 24 * 60 * 60 * 1e9; // 91.25 days in nanoseconds
+  const unlockTime = parseInt(unlockTimestamp);
+  const now = Date.now() * 1e6; // Convert to nanoseconds
+  const startTime = unlockTime - UNLOCK_PERIOD_NS;
+  const elapsed = now - startTime;
+  const progress = (elapsed / UNLOCK_PERIOD_NS) * 100;
+
+  return Math.min(Math.max(progress, 0), 100);
 }
 
 export function PublicAccountsList() {
@@ -62,77 +78,126 @@ export function PublicAccountsList() {
         {loading && accounts.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">Loading accounts...</div>
         ) : (
-          <div className="space-y-3 overflow-y-auto pr-2 flex-1">
-            {accounts.map((account, index) => {
+          <div className="space-y-4 overflow-y-auto pr-2 flex-1">
+            {accounts.map((account) => {
               const status = getStatus(
                 account.lockedNear,
                 account.pendingBalance,
                 account.unlockTimestamp,
               );
               const timeRemaining = getTimeRemaining(account.unlockTimestamp);
+              const unlockProgress = calculateUnlockProgress(account.unlockTimestamp);
+              const isUnlocking = status.label === "Unlocking";
+              const hasBalance =
+                parseFloat(account.lockedNear) > 0 || parseFloat(account.pendingBalance) > 0;
 
               return (
-                <div
-                  key={account.accountId}
-                  className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <span className="text-sm font-mono text-muted-foreground w-8 shrink-0">
-                        #{index + 1}
-                      </span>
-                      <a
-                        href={`https://nearblocks.io/address/${account.accountId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium truncate hover:underline hover:text-primary"
-                      >
-                        {account.accountId}
-                      </a>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold">{account.lockedNear}</p>
-                      <p className="text-xs text-muted-foreground">veNEAR</p>
-                    </div>
-                  </div>
+                <Card key={account.accountId} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    {/* Header with Account Info */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <a
+                            href={`https://nearblocks.io/address/${account.accountId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-semibold truncate"
+                            title={account.accountId}
+                          >
+                            {account.accountId}
+                          </a>
+                          <Badge variant={status.variant} className="shrink-0">
+                            {status.label}
+                          </Badge>
+                        </div>
+                      </div>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded ${
-                          status === "Locked"
-                            ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                            : status === "Unlocking"
-                              ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
-                              : "bg-gray-500/10 text-gray-600 dark:text-gray-400"
-                        }`}
-                      >
-                        {status}
-                      </span>
-                      {timeRemaining && (
-                        <span className="text-muted-foreground">{timeRemaining}</span>
+                      {/* Balance Display */}
+                      {hasBalance && (
+                        <div className="text-right shrink-0">
+                          <div className="text-lg font-bold leading-none mb-1">
+                            {parseFloat(account.lockedNear) > 0
+                              ? account.lockedNear
+                              : account.pendingBalance}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {parseFloat(account.lockedNear) > 0 ? "Locked" : "Pending"}
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  <div className="text-xs">
-                    <span className="text-muted-foreground">Lockup: </span>
-                    {account.lockupNotCreated ? (
-                      <span className="font-mono break-all text-yellow-600 dark:text-yellow-400">
-                        {account.lockupAccountId} (not created yet)
-                      </span>
-                    ) : (
-                      <a
-                        href={`https://nearblocks.io/address/${account.lockupAccountId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono break-all hover:underline hover:text-primary"
-                      >
-                        {account.lockupAccountId}
-                      </a>
+                    {/* Progress Bar for Unlocking Status */}
+                    {isUnlocking && unlockProgress > 0 && (
+                      <div className="mb-3">
+                        <div className="mb-1.5">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Unlock Progress
+                          </span>
+                        </div>
+                        <Progress value={unlockProgress} className="h-2" />
+                        {timeRemaining && (
+                          <p className="text-xs text-muted-foreground mt-1.5 text-center">
+                            {timeRemaining}
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                </div>
+
+                    {/* Balance Breakdown */}
+                    {parseFloat(account.pendingBalance) > 0 && (
+                      <div className="mb-3">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-muted/50 rounded p-2">
+                            <div className="text-muted-foreground mb-0.5">Locked</div>
+                            <div className="font-semibold">{account.lockedNear} veNEAR</div>
+                          </div>
+                          <div className="bg-muted/50 rounded p-2">
+                            <div className="text-muted-foreground mb-0.5">Pending</div>
+                            <div className="font-semibold">{account.pendingBalance} veNEAR</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Separator */}
+                    <Separator className="my-3" />
+
+                    {/* Lockup Contract Info */}
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground font-medium">
+                        Lockup Contract
+                      </div>
+                      {account.lockupNotCreated ? (
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className="text-yellow-600 dark:text-yellow-400 border-yellow-600/20"
+                          >
+                            Not Created
+                          </Badge>
+                          <span
+                            className="text-xs font-mono truncate"
+                            title={account.lockupAccountId}
+                          >
+                            {account.lockupAccountId}
+                          </span>
+                        </div>
+                      ) : (
+                        <a
+                          href={`https://nearblocks.io/address/${account.lockupAccountId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-mono block truncate"
+                          title={account.lockupAccountId}
+                        >
+                          {account.lockupAccountId}
+                        </a>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
 

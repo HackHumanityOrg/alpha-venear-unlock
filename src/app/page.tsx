@@ -13,13 +13,19 @@ function AppContent() {
   const {
     lockedBalance,
     pendingBalance,
+    liquidBalance,
     unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
+    stakingPoolInfo,
+    stakingStatus,
     loading,
     error,
     beginUnlock,
     endUnlock,
+    unstakeAll,
+    withdrawFromStakingPool,
+    transferToAccount,
   } = useVenearContract();
 
   return (
@@ -41,20 +47,33 @@ function AppContent() {
                 <VenearBalance
                   lockedBalance={lockedBalance}
                   pendingBalance={pendingBalance}
+                  liquidBalance={liquidBalance}
                   unlockTimestamp={unlockTimestamp}
                   lockupAccountId={lockupAccountId}
                   lockupNotCreated={lockupNotCreated}
+                  stakingStatus={stakingStatus}
+                  stakedBalance={stakingPoolInfo.stakedBalance}
+                  unstakedBalance={stakingPoolInfo.unstakedBalance}
+                  stakingPoolId={stakingPoolInfo.stakingPoolId}
                   error={error}
                 />
 
                 <UnlockActions
                   lockedBalance={lockedBalance}
                   pendingBalance={pendingBalance}
+                  liquidBalance={liquidBalance}
                   unlockTimestamp={unlockTimestamp}
+                  stakingStatus={stakingStatus}
+                  stakedBalance={stakingPoolInfo.stakedBalance}
+                  unstakedBalance={stakingPoolInfo.unstakedBalance}
+                  canWithdrawFromPool={stakingPoolInfo.canWithdraw}
                   loading={loading}
                   error={error}
                   onBeginUnlock={beginUnlock}
                   onEndUnlock={endUnlock}
+                  onUnstake={unstakeAll}
+                  onWithdrawFromPool={withdrawFromStakingPool}
+                  onTransfer={transferToAccount}
                 />
               </>
             )}

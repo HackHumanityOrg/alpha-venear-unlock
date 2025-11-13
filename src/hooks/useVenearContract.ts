@@ -6,10 +6,15 @@ import { actionCreators } from "@near-js/transactions";
 import Big from "big.js";
 import { getSharedProvider } from "@/lib/nearProvider";
 import { MAX_GAS, ONE_YOCTO_NEAR } from "@/lib/constants";
+import type { VenearBalance, StakingPoolInfo, StakingStatus } from "@/types/venear";
 
 interface QueryResult {
   result: Uint8Array;
 }
+
+// Gas amounts for specific operations (from contract documentation)
+const UNSTAKE_GAS = BigInt("125000000000000"); // 125 TGas
+const WITHDRAW_FROM_POOL_GAS = BigInt("125000000000000"); // 125 TGas
 
 const checkAccountExists = async (lockupId: string): Promise<boolean> => {
   const provider = getSharedProvider();
@@ -39,18 +44,21 @@ const parseNearAmount = (amount: string): string => {
   }
 };
 
-interface VenearBalance {
-  locked: string;
-  pending: string;
-  unlockTimestamp: string | null;
-}
-
 export function useVenearContract() {
   const { selector, accountId } = useWallet();
   const [balance, setBalance] = useState<VenearBalance>({
     locked: "0",
     pending: "0",
     unlockTimestamp: null,
+    liquid: "0",
+    accountBalance: "0",
+  });
+  const [stakingPoolInfo, setStakingPoolInfo] = useState<StakingPoolInfo>({
+    stakingPoolId: null,
+    stakedBalance: "0",
+    unstakedBalance: "0",
+    canWithdraw: false,
+    isUnstaking: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +116,14 @@ export function useVenearContract() {
 
         const provider = getSharedProvider();
 
-        const [lockedResult, pendingResult, timestampResult] = await Promise.allSettled([
+        const [
+          lockedResult,
+          pendingResult,
+          timestampResult,
+          liquidResult,
+          accountBalanceResult,
+          stakingPoolIdResult,
+        ] = await Promise.allSettled([
           provider.query({
             request_type: "call_function",
             finality: "final",
@@ -128,6 +143,27 @@ export function useVenearContract() {
             finality: "final",
             account_id: lockupAccountId,
             method_name: "get_venear_unlock_timestamp",
+            args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+          }),
+          provider.query({
+            request_type: "call_function",
+            finality: "final",
+            account_id: lockupAccountId,
+            method_name: "get_liquid_owners_balance",
+            args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+          }),
+          provider.query({
+            request_type: "call_function",
+            finality: "final",
+            account_id: lockupAccountId,
+            method_name: "get_account_balance",
+            args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+          }),
+          provider.query({
+            request_type: "call_function",
+            finality: "final",
+            account_id: lockupAccountId,
+            method_name: "get_staking_pool_account_id",
             args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
           }),
         ]);
@@ -155,13 +191,123 @@ export function useVenearContract() {
               )
             : null;
 
+        const liquid =
+          liquidResult.status === "fulfilled"
+            ? JSON.parse(
+                Buffer.from((liquidResult.value as unknown as QueryResult).result).toString(),
+              )
+            : "0";
+
+        const accountBalance =
+          accountBalanceResult.status === "fulfilled"
+            ? JSON.parse(
+                Buffer.from(
+                  (accountBalanceResult.value as unknown as QueryResult).result,
+                ).toString(),
+              )
+            : "0";
+
+        const stakingPoolId =
+          stakingPoolIdResult.status === "fulfilled"
+            ? JSON.parse(
+                Buffer.from(
+                  (stakingPoolIdResult.value as unknown as QueryResult).result,
+                ).toString(),
+              )
+            : null;
+
         if (signal?.aborted) return;
 
         setBalance({
           locked,
           pending,
           unlockTimestamp: timestamp,
+          liquid,
+          accountBalance,
         });
+
+        // Fetch staking pool info if a pool is configured
+        if (stakingPoolId) {
+          try {
+            const [stakedResult, unstakedResult, canWithdrawResult] = await Promise.allSettled([
+              provider.query({
+                request_type: "call_function",
+                finality: "final",
+                account_id: lockupAccountId,
+                method_name: "get_known_deposited_balance",
+                args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+              }),
+              provider.query({
+                request_type: "call_function",
+                finality: "final",
+                account_id: lockupAccountId,
+                method_name: "get_unstaked_balance",
+                args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+              }),
+              provider.query({
+                request_type: "call_function",
+                finality: "final",
+                account_id: lockupAccountId,
+                method_name: "is_staking_pool_idle",
+                args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+              }),
+            ]);
+
+            const stakedBalance =
+              stakedResult.status === "fulfilled"
+                ? JSON.parse(
+                    Buffer.from((stakedResult.value as unknown as QueryResult).result).toString(),
+                  )
+                : "0";
+
+            const unstakedBalance =
+              unstakedResult.status === "fulfilled"
+                ? JSON.parse(
+                    Buffer.from((unstakedResult.value as unknown as QueryResult).result).toString(),
+                  )
+                : "0";
+
+            const canWithdraw =
+              canWithdrawResult.status === "fulfilled"
+                ? JSON.parse(
+                    Buffer.from(
+                      (canWithdrawResult.value as unknown as QueryResult).result,
+                    ).toString(),
+                  )
+                : false;
+
+            const stakedNum = parseFloat(formatNearAmount(stakedBalance));
+            const unstakedNum = parseFloat(formatNearAmount(unstakedBalance));
+
+            setStakingPoolInfo({
+              stakingPoolId,
+              stakedBalance,
+              unstakedBalance,
+              canWithdraw,
+              isUnstaking: stakedNum === 0 && unstakedNum > 0,
+            });
+          } catch (err) {
+            console.error("Failed to fetch staking pool info:", err);
+            // Set default values if fetching fails
+            setStakingPoolInfo({
+              stakingPoolId,
+              stakedBalance: "0",
+              unstakedBalance: "0",
+              canWithdraw: false,
+              isUnstaking: false,
+            });
+          }
+        } else {
+          // No staking pool configured
+          setStakingPoolInfo({
+            stakingPoolId: null,
+            stakedBalance: "0",
+            unstakedBalance: "0",
+            canWithdraw: false,
+            isUnstaking: false,
+          });
+        }
+
         setError(null);
       } catch (err) {
         if (signal?.aborted) return;
@@ -247,6 +393,18 @@ export function useVenearContract() {
         }
       }
 
+      // Check if user has staked balance that needs to be unstaked first
+      const stakedNum = parseFloat(formatNearAmount(stakingPoolInfo.stakedBalance));
+      if (stakedNum > 0) {
+        throw new Error("Please unstake from staking pool before completing unlock");
+      }
+
+      // Check if unstaked balance needs to be withdrawn
+      const unstakedNum = parseFloat(formatNearAmount(stakingPoolInfo.unstakedBalance));
+      if (unstakedNum > 0 && stakingPoolInfo.canWithdraw) {
+        throw new Error("Please withdraw from staking pool before completing unlock");
+      }
+
       setLoading(true);
       setError(null);
 
@@ -263,25 +421,210 @@ export function useVenearContract() {
         setTimeout(() => fetchBalances(), 3000);
       } catch (err: unknown) {
         console.error("End unlock failed:", err);
-        setError(err instanceof Error ? err.message : "Failed to complete unlock");
+        const errorMessage = err instanceof Error ? err.message : "Failed to complete unlock";
+
+        // Enhanced error messages
+        if (errorMessage.includes("timestamp") || errorMessage.includes("not ready")) {
+          setError("Unlock period not yet complete. Please wait until the timer reaches zero.");
+        } else if (errorMessage.includes("staking pool")) {
+          setError("Please complete staking pool operations first.");
+        } else {
+          setError(errorMessage);
+        }
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [selector, accountId, lockupAccountId, balance.pending, fetchBalances],
+    [selector, accountId, lockupAccountId, balance.pending, stakingPoolInfo, fetchBalances],
   );
+
+  const unstakeAll = useCallback(async () => {
+    if (!selector || !accountId || !lockupAccountId)
+      throw new Error("Wallet not connected or lockup account not loaded");
+
+    if (!stakingPoolInfo.stakingPoolId) {
+      throw new Error("No staking pool configured");
+    }
+
+    const stakedNum = parseFloat(formatNearAmount(stakingPoolInfo.stakedBalance));
+    if (stakedNum === 0) {
+      throw new Error("No staked balance to unstake");
+    }
+
+    if (!stakingPoolInfo.canWithdraw) {
+      throw new Error("Staking pool is busy. Please try again in a few moments.");
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const wallet = await selector.wallet();
+
+      await wallet.signAndSendTransaction({
+        receiverId: lockupAccountId,
+        actions: [actionCreators.functionCall("unstake_all", {}, UNSTAKE_GAS, ONE_YOCTO_NEAR)],
+      });
+
+      setTimeout(() => fetchBalances(), 3000);
+    } catch (err: unknown) {
+      console.error("Unstake failed:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to unstake";
+
+      if (errorMessage.includes("busy") || errorMessage.includes("pending")) {
+        setError("Staking pool is busy. Please wait and try again.");
+      } else {
+        setError(errorMessage);
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [selector, accountId, lockupAccountId, stakingPoolInfo, fetchBalances]);
+
+  const withdrawFromStakingPool = useCallback(async () => {
+    if (!selector || !accountId || !lockupAccountId)
+      throw new Error("Wallet not connected or lockup account not loaded");
+
+    if (!stakingPoolInfo.stakingPoolId) {
+      throw new Error("No staking pool configured");
+    }
+
+    const unstakedNum = parseFloat(formatNearAmount(stakingPoolInfo.unstakedBalance));
+    if (unstakedNum === 0) {
+      throw new Error("No unstaked balance to withdraw");
+    }
+
+    if (!stakingPoolInfo.canWithdraw) {
+      throw new Error(
+        "Staking pool is busy or unstaking period not complete. Please try again later.",
+      );
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const wallet = await selector.wallet();
+
+      await wallet.signAndSendTransaction({
+        receiverId: lockupAccountId,
+        actions: [
+          actionCreators.functionCall(
+            "withdraw_all_from_staking_pool",
+            {},
+            WITHDRAW_FROM_POOL_GAS,
+            ONE_YOCTO_NEAR,
+          ),
+        ],
+      });
+
+      setTimeout(() => fetchBalances(), 3000);
+    } catch (err: unknown) {
+      console.error("Withdraw from staking pool failed:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to withdraw from staking pool";
+
+      if (errorMessage.includes("busy") || errorMessage.includes("pending")) {
+        setError("Staking pool is busy. Please wait and try again.");
+      } else if (errorMessage.includes("not ready")) {
+        setError("Unstaking period not complete. Please wait 2-4 epochs (12-24 hours).");
+      } else {
+        setError(errorMessage);
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [selector, accountId, lockupAccountId, stakingPoolInfo, fetchBalances]);
+
+  const transferToAccount = useCallback(
+    async (amount: string, receiverId?: string) => {
+      if (!selector || !accountId || !lockupAccountId)
+        throw new Error("Wallet not connected or lockup account not loaded");
+
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        throw new Error("Invalid amount: must be a positive number");
+      }
+
+      const liquidNum = parseFloat(formatNearAmount(balance.liquid || "0"));
+      if (amountNum > liquidNum) {
+        throw new Error(
+          `Amount exceeds liquid balance of ${formatNearAmount(balance.liquid || "0")} NEAR`,
+        );
+      }
+
+      const recipient = receiverId || accountId;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const wallet = await selector.wallet();
+
+        await wallet.signAndSendTransaction({
+          receiverId: lockupAccountId,
+          actions: [
+            actionCreators.functionCall(
+              "transfer",
+              {
+                amount: parseNearAmount(amount),
+                receiver_id: recipient,
+              },
+              MAX_GAS,
+              ONE_YOCTO_NEAR,
+            ),
+          ],
+        });
+
+        setTimeout(() => fetchBalances(), 3000);
+      } catch (err: unknown) {
+        console.error("Transfer failed:", err);
+        setError(err instanceof Error ? err.message : "Failed to transfer");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selector, accountId, lockupAccountId, balance.liquid, fetchBalances],
+  );
+
+  const getStakingStatus = useCallback((): StakingStatus => {
+    if (!stakingPoolInfo.stakingPoolId) return "not_staked";
+
+    const stakedNum = parseFloat(formatNearAmount(stakingPoolInfo.stakedBalance));
+    const unstakedNum = parseFloat(formatNearAmount(stakingPoolInfo.unstakedBalance));
+
+    if (stakedNum > 0) return "staked";
+    if (stakingPoolInfo.isUnstaking) return "unstaking";
+    if (unstakedNum > 0) return "unstaked";
+
+    return "not_staked";
+  }, [stakingPoolInfo]);
 
   return {
     lockedBalance: formatNearAmount(balance.locked),
     pendingBalance: formatNearAmount(balance.pending),
+    liquidBalance: formatNearAmount(balance.liquid || "0"),
+    accountBalance: formatNearAmount(balance.accountBalance || "0"),
     unlockTimestamp: balance.unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
+    stakingPoolInfo: {
+      ...stakingPoolInfo,
+      stakedBalance: formatNearAmount(stakingPoolInfo.stakedBalance),
+      unstakedBalance: formatNearAmount(stakingPoolInfo.unstakedBalance),
+    },
+    stakingStatus: getStakingStatus(),
     loading,
     error,
     beginUnlock,
     endUnlock,
+    unstakeAll,
+    withdrawFromStakingPool,
+    transferToAccount,
     refreshBalances: fetchBalances,
   };
 }

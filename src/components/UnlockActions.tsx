@@ -6,34 +6,59 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { isUnlockReady } from "@/lib/timeUtils";
 
+import type { StakingStatus } from "@/types/venear";
+
 interface UnlockActionsProps {
   lockedBalance: string;
   pendingBalance: string;
+  liquidBalance?: string;
   unlockTimestamp: string | null;
+  stakingStatus?: StakingStatus;
+  stakedBalance?: string;
+  unstakedBalance?: string;
+  canWithdrawFromPool?: boolean;
   loading: boolean;
   error: string | null;
   onBeginUnlock: () => Promise<void>;
   onEndUnlock: () => Promise<void>;
+  onUnstake?: () => Promise<void>;
+  onWithdrawFromPool?: () => Promise<void>;
+  onTransfer?: (amount: string) => Promise<void>;
 }
 
 export function UnlockActions({
   lockedBalance,
   pendingBalance,
+  liquidBalance = "0",
   unlockTimestamp,
+  stakingStatus = "not_staked",
+  stakedBalance = "0",
+  unstakedBalance = "0",
+  canWithdrawFromPool = false,
   loading,
   error,
   onBeginUnlock,
   onEndUnlock,
+  onUnstake,
+  onWithdrawFromPool,
+  onTransfer,
 }: UnlockActionsProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showTransferConfirm, setShowTransferConfirm] = useState(false);
 
   const hasLocked = parseFloat(lockedBalance) > 0;
   const hasPending = parseFloat(pendingBalance) > 0;
+  const hasLiquid = parseFloat(liquidBalance) > 0;
+  const hasStaked = parseFloat(stakedBalance) > 0;
+  const hasUnstaked = parseFloat(unstakedBalance) > 0;
   const hasUnlockPending = unlockTimestamp && unlockTimestamp !== "0";
 
   // Derive canWithdraw directly from unlockTimestamp during render
   const canWithdraw = unlockTimestamp && unlockTimestamp !== "0" && isUnlockReady(unlockTimestamp);
+
+  const shouldUnstakeFirst = stakingStatus === "staked" && hasStaked;
+  const shouldWithdrawFirst = stakingStatus === "unstaked" && hasUnstaked && canWithdrawFromPool;
 
   const handleBeginUnlock = async () => {
     try {
@@ -54,6 +79,38 @@ export function UnlockActions({
     }
   };
 
+  const handleUnstake = async () => {
+    if (!onUnstake) return;
+    try {
+      setActionError(null);
+      await onUnstake();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to unstake");
+    }
+  };
+
+  const handleWithdrawFromPool = async () => {
+    if (!onWithdrawFromPool) return;
+    try {
+      setActionError(null);
+      await onWithdrawFromPool();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to withdraw from staking pool");
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!onTransfer) return;
+    try {
+      setActionError(null);
+      setShowTransferConfirm(false);
+      // Transfer all liquid balance to user's account
+      await onTransfer(liquidBalance);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to transfer");
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -64,6 +121,67 @@ export function UnlockActions({
         {(error || actionError) && (
           <Alert variant="destructive">
             <AlertDescription>{error || actionError}</AlertDescription>
+          </Alert>
+        )}
+
+        {shouldUnstakeFirst && (
+          <Alert variant="default">
+            <AlertDescription>
+              <div className="space-y-3">
+                <p className="font-semibold">Staking Pool Action Required</p>
+                <p className="text-sm">
+                  You have {stakedBalance} NEAR staked. You must unstake before completing the
+                  unlock process.
+                </p>
+                <Button
+                  onClick={handleUnstake}
+                  disabled={loading}
+                  variant="default"
+                  size="sm"
+                  className="w-full"
+                >
+                  {loading ? "Processing..." : `Unstake ${stakedBalance} NEAR`}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Note: After unstaking, you&apos;ll need to wait 2-4 epochs (12-24 hours) before
+                  withdrawing.
+                </p>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {shouldWithdrawFirst && (
+          <Alert variant="default">
+            <AlertDescription>
+              <div className="space-y-3">
+                <p className="font-semibold">Withdraw from Staking Pool</p>
+                <p className="text-sm">
+                  You have {unstakedBalance} NEAR unstaked and ready to withdraw from the staking
+                  pool.
+                </p>
+                <Button
+                  onClick={handleWithdrawFromPool}
+                  disabled={loading}
+                  variant="default"
+                  size="sm"
+                  className="w-full"
+                >
+                  {loading ? "Processing..." : `Withdraw ${unstakedBalance} NEAR`}
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {stakingStatus === "unstaking" && hasUnstaked && !canWithdrawFromPool && (
+          <Alert variant="default">
+            <AlertDescription>
+              <p className="text-sm">
+                Your NEAR is unstaking. Please wait 2-4 epochs (12-24 hours) before you can withdraw
+                from the staking pool.
+              </p>
+            </AlertDescription>
           </Alert>
         )}
 
@@ -123,16 +241,73 @@ export function UnlockActions({
           <div className="space-y-2">
             <Button
               onClick={handleEndUnlock}
-              disabled={loading}
+              disabled={loading || shouldUnstakeFirst || shouldWithdrawFirst}
               className="w-full"
               variant="default"
               size="lg"
             >
-              {loading ? "Processing..." : "Complete Unlock & Withdraw"}
+              {loading ? "Processing..." : "Complete Unlock"}
             </Button>
-            <p className="text-xs text-green-600 dark:text-green-400 text-center font-medium">
-              ✓ Your tokens are ready to withdraw!
-            </p>
+            {(shouldUnstakeFirst || shouldWithdrawFirst) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                ⚠ Complete staking pool operations first
+              </p>
+            )}
+            {!shouldUnstakeFirst && !shouldWithdrawFirst && (
+              <p className="text-xs text-green-600 dark:text-green-400 text-center font-medium">
+                ✓ Your tokens are ready to unlock!
+              </p>
+            )}
+          </div>
+        )}
+
+        {hasLiquid && onTransfer && (
+          <div className="space-y-2">
+            {!showTransferConfirm ? (
+              <>
+                <Button
+                  onClick={() => setShowTransferConfirm(true)}
+                  disabled={loading}
+                  className="w-full"
+                  variant="secondary"
+                  size="lg"
+                >
+                  Transfer {liquidBalance} NEAR to My Account
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Transfer unlocked NEAR from lockup contract to your account
+                </p>
+              </>
+            ) : (
+              <>
+                <Alert variant="default">
+                  <AlertDescription>
+                    <div className="space-y-3">
+                      <p className="font-semibold">Confirm Transfer</p>
+                      <p className="text-sm">Transfer {liquidBalance} NEAR to your account?</p>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleTransfer}
+                          disabled={loading}
+                          variant="default"
+                          size="sm"
+                        >
+                          {loading ? "Processing..." : "Yes, Transfer"}
+                        </Button>
+                        <Button
+                          onClick={() => setShowTransferConfirm(false)}
+                          disabled={loading}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              </>
+            )}
           </div>
         )}
 
@@ -154,9 +329,10 @@ export function UnlockActions({
         <div className="mt-6 p-4 rounded-lg bg-muted text-sm space-y-2">
           <p className="font-semibold">How it works:</p>
           <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-            <li>Click &ldquo;Begin Unlock&rdquo; to start the unlock process</li>
-            <li>Wait for the unlock period to complete (typically 3 months)</li>
-            <li>Click &ldquo;Complete Unlock &amp; Withdraw&rdquo; to receive your tokens</li>
+            <li>Click &ldquo;Begin Unlock&rdquo; to start the unlock process (3 month wait)</li>
+            <li>If tokens are staked: Unstake → Wait 12-24 hours → Withdraw from pool</li>
+            <li>When timer reaches zero: Click &ldquo;Complete Unlock&rdquo;</li>
+            <li>Click &ldquo;Transfer to My Account&rdquo; to receive your NEAR</li>
           </ol>
         </div>
       </CardContent>

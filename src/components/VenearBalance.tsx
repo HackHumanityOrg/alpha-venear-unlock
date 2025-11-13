@@ -5,21 +5,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calculateTimeRemaining } from "@/lib/timeUtils";
 
+import type { StakingStatus } from "@/types/venear";
+
 interface VenearBalanceProps {
   lockedBalance: string;
   pendingBalance: string;
+  liquidBalance?: string;
   unlockTimestamp: string | null;
   lockupAccountId: string | null;
   lockupNotCreated?: boolean;
+  stakingStatus?: StakingStatus;
+  stakedBalance?: string;
+  unstakedBalance?: string;
+  stakingPoolId?: string | null;
   error?: string | null;
 }
 
 export function VenearBalance({
   lockedBalance,
   pendingBalance,
+  liquidBalance,
   unlockTimestamp,
   lockupAccountId,
   lockupNotCreated,
+  stakingStatus = "unknown",
+  stakedBalance = "0",
+  unstakedBalance = "0",
+  stakingPoolId,
   error,
 }: VenearBalanceProps) {
   // Calculate initial values during render
@@ -55,8 +67,40 @@ export function VenearBalance({
 
   const hasLocked = parseFloat(lockedBalance) > 0;
   const hasPending = parseFloat(pendingBalance) > 0;
-  const hasAnyBalance = hasLocked || hasPending;
+  const hasLiquid = parseFloat(liquidBalance || "0") > 0;
+  const hasStaked = parseFloat(stakedBalance) > 0;
+  const hasUnstaked = parseFloat(unstakedBalance) > 0;
+  const hasAnyBalance = hasLocked || hasPending || hasLiquid;
   const isLockupContractError = error?.includes("may not exist");
+
+  const getStakingStatusBadge = () => {
+    switch (stakingStatus) {
+      case "staked":
+        return {
+          label: "Staked",
+          className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+        };
+      case "unstaking":
+        return {
+          label: "Unstaking",
+          className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+        };
+      case "unstaked":
+        return {
+          label: "Unstaked",
+          className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+        };
+      case "not_staked":
+        return {
+          label: "Not Staked",
+          className: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+        };
+      default:
+        return null;
+    }
+  };
+
+  const stakingBadge = getStakingStatusBadge();
 
   return (
     <Card>
@@ -104,6 +148,53 @@ export function VenearBalance({
             <p className="text-2xl font-semibold">
               {pendingBalance} <span className="text-lg text-muted-foreground">veNEAR</span>
             </p>
+          </div>
+        )}
+
+        {hasLiquid && (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground font-medium">Liquid Balance</p>
+            <p className="text-2xl font-semibold">
+              {liquidBalance} <span className="text-lg text-muted-foreground">NEAR</span>
+            </p>
+            <p className="text-xs text-muted-foreground">Available to transfer to your account</p>
+          </div>
+        )}
+
+        {stakingPoolId && stakingBadge && (
+          <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground font-medium">Staking Status</p>
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${stakingBadge.className}`}
+              >
+                {stakingBadge.label}
+              </span>
+            </div>
+
+            {hasStaked && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Staked Balance</p>
+                <p className="text-lg font-semibold">{stakedBalance} NEAR</p>
+              </div>
+            )}
+
+            {hasUnstaked && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Unstaked Balance</p>
+                <p className="text-lg font-semibold">{unstakedBalance} NEAR</p>
+                <p className="text-xs text-muted-foreground">
+                  {stakingStatus === "unstaking"
+                    ? "Wait 2-4 epochs (12-24 hours) before withdrawing"
+                    : "Ready to withdraw"}
+                </p>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-border">
+              <p className="text-xs text-muted-foreground">Staking Pool</p>
+              <p className="text-xs font-mono break-all mt-1">{stakingPoolId}</p>
+            </div>
           </div>
         )}
 
