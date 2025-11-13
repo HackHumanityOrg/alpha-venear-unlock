@@ -58,7 +58,7 @@ export function UnlockActions({
 
   const hasLocked = Big(lockedBalance).gt(0);
   const hasPending = Big(pendingBalance).gt(0);
-  const hasLiquid = Big(liquidBalance || "0").gt(0);
+  const hasLiquid = Big(liquidBalance || "0").gt(Big(10).pow(20)); // 0.0001 NEAR in yocto
   const hasStaked = Big(stakedBalance || "0").gt(0);
   const hasUnstaked = Big(unstakedBalance || "0").gt(0);
   const hasUnlockPending = unlockTimestamp && unlockTimestamp !== "0";
@@ -139,8 +139,8 @@ export function UnlockActions({
               <div className="space-y-3">
                 <p className="font-semibold">Staking Pool Action Required</p>
                 <p className="text-sm">
-                  You have {formatNearAmount(stakedBalance || "0")} NEAR staked. You must unstake before
-                  completing the unlock process.
+                  You have {formatNearAmount(stakedBalance || "0")} NEAR staked. You must unstake
+                  before completing the unlock process.
                 </p>
                 <Button
                   onClick={handleUnstake}
@@ -149,7 +149,9 @@ export function UnlockActions({
                   size="sm"
                   className="w-full"
                 >
-                  {loading ? "Processing..." : `Unstake ${formatNearAmount(stakedBalance || "0")} NEAR`}
+                  {loading
+                    ? "Processing..."
+                    : `Unstake ${formatNearAmount(stakedBalance || "0")} NEAR`}
                 </Button>
                 <p className="text-xs text-muted-foreground">
                   Note: After unstaking, you&apos;ll need to wait 2-4 epochs (12-24 hours) before
@@ -166,8 +168,8 @@ export function UnlockActions({
               <div className="space-y-3">
                 <p className="font-semibold">Withdraw from Staking Pool</p>
                 <p className="text-sm">
-                  You have {formatNearAmount(unstakedBalance || "0")} NEAR unstaked and ready to withdraw
-                  from the staking pool.
+                  You have {formatNearAmount(unstakedBalance || "0")} NEAR unstaked and ready to
+                  withdraw from the staking pool.
                 </p>
                 <Button
                   onClick={handleWithdrawFromPool}
@@ -176,7 +178,9 @@ export function UnlockActions({
                   size="sm"
                   className="w-full"
                 >
-                  {loading ? "Processing..." : `Withdraw ${formatNearAmount(unstakedBalance || "0")} NEAR`}
+                  {loading
+                    ? "Processing..."
+                    : `Withdraw ${formatNearAmount(unstakedBalance || "0")} NEAR`}
                 </Button>
               </div>
             </AlertDescription>

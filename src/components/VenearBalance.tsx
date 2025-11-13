@@ -187,14 +187,18 @@ export function VenearBalance({
             {hasStaked && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Staked Balance</p>
-                <p className="text-lg font-semibold">{formatNearAmount(stakedBalance || "0")} NEAR</p>
+                <p className="text-lg font-semibold">
+                  {formatNearAmount(stakedBalance || "0")} NEAR
+                </p>
               </div>
             )}
 
             {hasUnstaked && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Unstaked Balance</p>
-                <p className="text-lg font-semibold">{formatNearAmount(unstakedBalance || "0")} NEAR</p>
+                <p className="text-lg font-semibold">
+                  {formatNearAmount(unstakedBalance || "0")} NEAR
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {stakingStatus === "unstaking"
                     ? "Wait 2-4 epochs (12-24 hours) before withdrawing"
