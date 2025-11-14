@@ -27,6 +27,7 @@ export function ClientPageContent() {
     beginUnlock,
     endUnlock,
     transferToAccount,
+    deleteLockup,
   } = useVenearContract();
 
   const {
@@ -73,6 +74,7 @@ export function ClientPageContent() {
             onBeginUnlock={beginUnlock}
             onEndUnlock={endUnlock}
             onTransfer={transferToAccount}
+            onDeleteLockup={deleteLockup}
           />
         </>
       )}

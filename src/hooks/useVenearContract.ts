@@ -385,6 +385,45 @@ export function useVenearContract() {
     [selector, accountId, lockupAccountId, balance.liquid, fetchBalances, isTestMode],
   );
 
+  const deleteLockup = useCallback(async () => {
+    if (isTestMode) {
+      throw new Error("Transactions are disabled in test mode");
+    }
+
+    if (!selector || !accountId || !lockupAccountId)
+      throw new Error("Wallet not connected or lockup account not loaded");
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const wallet = await selector.wallet();
+
+      await wallet.signAndSendTransaction({
+        receiverId: lockupAccountId,
+        actions: [actionCreators.functionCall("delete_lockup", {}, MAX_GAS, ONE_YOCTO_NEAR)],
+      });
+
+      // After deletion, the lockup account will no longer exist
+      setTimeout(() => {
+        setLockupNotCreated(true);
+        setBalance({
+          locked: "0",
+          pending: "0",
+          unlockTimestamp: null,
+          liquid: "0",
+          accountBalance: "0",
+        });
+      }, 3000);
+    } catch (err: unknown) {
+      console.error("Delete lockup failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to delete lockup contract");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [selector, accountId, lockupAccountId, isTestMode]);
+
   return {
     lockedBalance: balance.locked,
     pendingBalance: balance.pending,
@@ -398,6 +437,7 @@ export function useVenearContract() {
     beginUnlock,
     endUnlock,
     transferToAccount,
+    deleteLockup,
     refreshBalances: fetchBalances,
   };
 }
