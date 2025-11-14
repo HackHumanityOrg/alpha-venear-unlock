@@ -196,6 +196,96 @@ export function PublicAccountsList() {
                         </a>
                       )}
                     </div>
+
+                    {/* Staking Pool Info */}
+                    {account.stakingPoolInfo?.stakingPoolId && (
+                      <>
+                        <Separator className="my-3" />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-muted-foreground font-medium">
+                              Staking Pool
+                            </div>
+                            {/* Status Badge */}
+                            {account.stakingPoolInfo.canWithdraw && (
+                              <Badge
+                                variant="outline"
+                                className="text-green-600 dark:text-green-400 border-green-600/30 bg-green-50 dark:bg-green-950"
+                              >
+                                Ready to Withdraw
+                              </Badge>
+                            )}
+                            {account.stakingPoolInfo.isUnstaking && (
+                              <Badge
+                                variant="outline"
+                                className="text-yellow-600 dark:text-yellow-400 border-yellow-600/30 bg-yellow-50 dark:bg-yellow-950"
+                              >
+                                Unstaking
+                              </Badge>
+                            )}
+                          </div>
+                          <a
+                            href={`https://nearblocks.io/address/${account.stakingPoolInfo.stakingPoolId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-mono block truncate mb-2 hover:text-primary"
+                            title={account.stakingPoolInfo.stakingPoolId}
+                          >
+                            {account.stakingPoolInfo.stakingPoolId}
+                          </a>
+
+                          {/* Staking Balance Grid */}
+                          {(parseFloat(account.stakingPoolInfo.availableBalance || "0") > 0 ||
+                            parseFloat(account.stakingPoolInfo.stakedBalance) > 0 ||
+                            parseFloat(account.stakingPoolInfo.unstakedBalance) > 0) && (
+                            <div className="space-y-2">
+                              {/* Available Balance - Most Important */}
+                              {parseFloat(account.stakingPoolInfo.availableBalance || "0") > 0 && (
+                                <div className="bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-900 rounded p-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs text-green-700 dark:text-green-300 font-medium">
+                                      ✓ Available to Withdraw
+                                    </div>
+                                    <div className="text-sm font-bold text-green-700 dark:text-green-300">
+                                      {account.stakingPoolInfo.availableBalance} NEAR
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Unstaking Balance - Time Sensitive */}
+                              {account.stakingPoolInfo.isUnstaking &&
+                                parseFloat(account.stakingPoolInfo.unstakedBalance) > 0 && (
+                                  <div className="bg-yellow-50 dark:bg-yellow-950/50 border border-yellow-200 dark:border-yellow-900 rounded p-2">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">
+                                        ⏳ Unstaking (4 epochs)
+                                      </div>
+                                      <div className="text-sm font-bold text-yellow-700 dark:text-yellow-300">
+                                        {account.stakingPoolInfo.unstakedBalance} NEAR
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                              {/* Staked Balance - Stable State */}
+                              {parseFloat(account.stakingPoolInfo.stakedBalance) > 0 && (
+                                <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 rounded p-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                                      🔒 Staked
+                                    </div>
+                                    <div className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                                      {account.stakingPoolInfo.stakedBalance} NEAR
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               );

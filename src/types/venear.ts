@@ -10,6 +10,7 @@ export interface StakingPoolInfo {
   stakingPoolId: string | null;
   stakedBalance: string;
   unstakedBalance: string;
+  availableBalance?: string;
   canWithdraw: boolean;
   isUnstaking: boolean;
 }
