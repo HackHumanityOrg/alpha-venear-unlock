@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Big from "big.js";
 import { VENEAR_CONTRACT_ID } from "@/contexts/WalletContext";
 import { getSharedProvider } from "@/lib/nearProvider";
+import { fetchStakingPoolInfo } from "@/lib/stakingPoolUtils";
 import type { StakingPoolInfo } from "@/types/venear";
 
 const ACCOUNTS_PER_QUERY = 100;
@@ -129,7 +130,7 @@ export function usePublicVenearAccounts() {
               lockupNotCreated = true;
             } else {
               try {
-                const [lockedResult, pendingResult, timestampResult, poolIdResult] = await Promise.allSettled([
+                const [lockedResult, pendingResult, timestampResult] = await Promise.allSettled([
                   provider.query({
                     request_type: "call_function",
                     finality: "final",
@@ -149,13 +150,6 @@ export function usePublicVenearAccounts() {
                     finality: "final",
                     account_id: lockupId,
                     method_name: "get_venear_unlock_timestamp",
-                    args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
-                  }),
-                  provider.query({
-                    request_type: "call_function",
-                    finality: "final",
-                    account_id: lockupId,
-                    method_name: "get_staking_pool_account_id",
                     args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
                   }),
                 ]);
@@ -180,111 +174,11 @@ export function usePublicVenearAccounts() {
                   );
                 }
 
-                // Query staking pool info if pool exists
-                if (poolIdResult.status === "fulfilled") {
-                  const poolId = JSON.parse(
-                    Buffer.from((poolIdResult.value as unknown as QueryResult).result).toString(),
-                  );
-
-                  if (poolId && poolId !== null) {
-                    try {
-                      const [stakedResult, unstakedResult, availableResult, isAvailableResult] = await Promise.allSettled([
-                        provider.query({
-                          request_type: "call_function",
-                          finality: "final",
-                          account_id: poolId,
-                          method_name: "get_account_staked_balance",
-                          args_base64: Buffer.from(
-                            JSON.stringify({ account_id: lockupId }),
-                          ).toString("base64"),
-                        }),
-                        provider.query({
-                          request_type: "call_function",
-                          finality: "final",
-                          account_id: poolId,
-                          method_name: "get_account_unstaked_balance",
-                          args_base64: Buffer.from(
-                            JSON.stringify({ account_id: lockupId }),
-                          ).toString("base64"),
-                        }),
-                        provider.query({
-                          request_type: "call_function",
-                          finality: "final",
-                          account_id: poolId,
-                          method_name: "get_account_available_balance",
-                          args_base64: Buffer.from(
-                            JSON.stringify({ account_id: lockupId }),
-                          ).toString("base64"),
-                        }),
-                        provider.query({
-                          request_type: "call_function",
-                          finality: "final",
-                          account_id: poolId,
-                          method_name: "is_account_unstaked_balance_available",
-                          args_base64: Buffer.from(
-                            JSON.stringify({ account_id: lockupId }),
-                          ).toString("base64"),
-                        }),
-                      ]);
-
-                      const stakedBalance =
-                        stakedResult.status === "fulfilled"
-                          ? JSON.parse(
-                              Buffer.from(
-                                (stakedResult.value as unknown as QueryResult).result,
-                              ).toString(),
-                            )
-                          : "0";
-
-                      const unstakedBalance =
-                        unstakedResult.status === "fulfilled"
-                          ? JSON.parse(
-                              Buffer.from(
-                                (unstakedResult.value as unknown as QueryResult).result,
-                              ).toString(),
-                            )
-                          : "0";
-
-                      const availableBalance =
-                        availableResult.status === "fulfilled"
-                          ? JSON.parse(
-                              Buffer.from(
-                                (availableResult.value as unknown as QueryResult).result,
-                              ).toString(),
-                            )
-                          : "0";
-
-                      const isAvailable =
-                        isAvailableResult.status === "fulfilled"
-                          ? JSON.parse(
-                              Buffer.from(
-                                (isAvailableResult.value as unknown as QueryResult).result,
-                              ).toString(),
-                            )
-                          : false;
-
-                      // Convert to NEAR and format
-                      const stakedNear = Big(stakedBalance).div(Big(10).pow(24)).toFixed(2);
-                      const unstakedNear = Big(unstakedBalance).div(Big(10).pow(24)).toFixed(2);
-                      const availableNear = Big(availableBalance).div(Big(10).pow(24)).toFixed(2);
-
-                      // Determine staking status
-                      const hasUnstakedBalance = parseFloat(unstakedNear) > 0;
-                      const canWithdrawFromPool = hasUnstakedBalance && isAvailable === true;
-                      const isCurrentlyUnstaking = hasUnstakedBalance && isAvailable === false;
-
-                      stakingPoolInfo = {
-                        stakingPoolId: poolId,
-                        stakedBalance: stakedNear,
-                        unstakedBalance: unstakedNear,
-                        availableBalance: availableNear,
-                        canWithdraw: canWithdrawFromPool,
-                        isUnstaking: isCurrentlyUnstaking,
-                      };
-                    } catch (err) {
-                      console.warn(`Error querying staking pool ${poolId}:`, err);
-                    }
-                  }
+                // Query staking pool info using utility function
+                try {
+                  stakingPoolInfo = (await fetchStakingPoolInfo(lockupId)) ?? undefined;
+                } catch (err) {
+                  console.warn(`Error querying staking pool for ${lockupId}:`, err);
                 }
               } catch (err) {
                 console.warn(`Error querying lockup account ${lockupId}:`, err);

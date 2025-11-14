@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { isUnlockReady } from "@/lib/timeUtils";
 import Big from "big.js";
+import type { StakingPoolInfo } from "@/types/venear";
 
 const formatNearAmount = (yoctoAmount: string): string => {
   try {
@@ -20,6 +21,7 @@ interface UnlockActionsProps {
   pendingBalance: string;
   liquidBalance?: string;
   unlockTimestamp: string | null;
+  stakingInfo: StakingPoolInfo | null;
   loading: boolean;
   error: string | null;
   onBeginUnlock: () => Promise<void>;
@@ -32,6 +34,7 @@ export function UnlockActions({
   pendingBalance,
   liquidBalance = "0",
   unlockTimestamp,
+  stakingInfo,
   loading,
   error,
   onBeginUnlock,
@@ -47,9 +50,15 @@ export function UnlockActions({
   const hasLiquid = Big(liquidBalance || "0").gt(Big(10).pow(20)); // 0.0001 NEAR in yocto
   const hasUnlockPending = unlockTimestamp && unlockTimestamp !== "0";
 
-  // Check if unlock period is complete
+  // Check if unlock period is complete - NOT blocked by staking
   const canCompleteUnlock =
     unlockTimestamp && unlockTimestamp !== "0" && isUnlockReady(unlockTimestamp);
+
+  // Check staking status for messaging
+  const totalInPool = stakingInfo
+    ? Big(stakingInfo.stakedBalance || "0").plus(Big(stakingInfo.unstakedBalance || "0"))
+    : Big(0);
+  const hasFundsInPool = totalInPool.gt(0);
 
   const handleBeginUnlock = async () => {
     try {
@@ -106,10 +115,10 @@ export function UnlockActions({
                   className="w-full"
                   size="lg"
                 >
-                  Start Unlock (91 Days)
+                  Start Unlock (91.25 Days)
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  Initiates a 91-day unlock period for all locked tokens
+                  Initiates a 91.25-day unlock period for all locked tokens
                 </p>
               </>
             ) : (
@@ -119,7 +128,7 @@ export function UnlockActions({
                     <div className="space-y-3">
                       <p className="font-semibold">Confirm: Start Unlock Process?</p>
                       <p className="text-sm">
-                        This will begin the 91-day unlock period. You cannot reverse this action.
+                        This will begin the 91.25-day unlock period. You cannot reverse this action.
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -162,6 +171,16 @@ export function UnlockActions({
             <p className="text-xs text-green-600 dark:text-green-400 text-center font-medium">
               ✓ Unlock period complete! Click to finalize.
             </p>
+            {hasFundsInPool && (
+              <Alert variant="default" className="mt-2">
+                <AlertDescription className="text-sm">
+                  <strong>Note:</strong> You have{" "}
+                  {formatNearAmount(totalInPool.mul(Big(10).pow(24)).toFixed(0))} NEAR in the
+                  staking pool. You can complete unlock now, but you&apos;ll need to withdraw from
+                  the pool before transferring those funds to your wallet.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         )}
 
@@ -178,9 +197,12 @@ export function UnlockActions({
                   size="lg"
                 >
                   Transfer {formatNearAmount(liquidBalance || "0")} NEAR to My Wallet
+                  {hasFundsInPool && " (partial)"}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  Move NEAR from lockup contract to your wallet
+                  {hasFundsInPool
+                    ? `Transfers liquid balance only. ${formatNearAmount(totalInPool.mul(Big(10).pow(24)).toFixed(0))} NEAR remains in staking pool.`
+                    : "Move NEAR from lockup contract to your wallet"}
                 </p>
               </>
             ) : (
@@ -192,6 +214,13 @@ export function UnlockActions({
                       <p className="text-sm">
                         Transfer {formatNearAmount(liquidBalance || "0")} NEAR to your wallet?
                       </p>
+                      {hasFundsInPool && (
+                        <p className="text-xs text-muted-foreground">
+                          Note: {formatNearAmount(totalInPool.mul(Big(10).pow(24)).toFixed(0))} NEAR
+                          in staking pool will not be transferred. Withdraw from the pool first to
+                          transfer those funds.
+                        </p>
+                      )}
                       <div className="flex gap-2">
                         <Button
                           onClick={handleTransfer}
@@ -221,7 +250,7 @@ export function UnlockActions({
         {hasUnlockPending && !canCompleteUnlock && (
           <div className="text-center space-y-2 py-4">
             <p className="text-sm text-muted-foreground">
-              Unlock in progress. Complete Unlock button will appear when the 91-day period ends.
+              Unlock in progress. Complete Unlock button will appear when the 91.25-day period ends.
             </p>
           </div>
         )}
@@ -235,11 +264,18 @@ export function UnlockActions({
         <div className="mt-6 p-4 rounded-lg bg-muted text-sm space-y-2">
           <p className="font-semibold">How it works:</p>
           <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-            <li>Click &ldquo;Start Unlock&rdquo; to begin the 91-day unlock period</li>
-            <li>Wait 91 days for the unlock timer to complete</li>
-            <li>Click &ldquo;Complete Unlock&rdquo; to finalize the unlock</li>
-            <li>Click &ldquo;Transfer to My Wallet&rdquo; to move NEAR to your wallet</li>
+            <li>Click &ldquo;Start Unlock&rdquo; to begin the 91.25-day unlock period</li>
+            <li>Wait 91.25 days for the unlock timer to complete</li>
+            <li>
+              Click &ldquo;Complete Unlock&rdquo; to finalize (works even if funds are staked)
+            </li>
+            <li>If you have staked funds, withdraw them using the Staking Status card above</li>
+            <li>Click &ldquo;Transfer to My Wallet&rdquo; to move liquid NEAR to your wallet</li>
           </ol>
+          <p className="text-xs text-muted-foreground mt-2">
+            <strong>Note:</strong> You can only transfer NEAR that&apos;s in your lockup contract
+            (liquid balance). Staked funds must be withdrawn from the staking pool first.
+          </p>
         </div>
       </CardContent>
     </Card>

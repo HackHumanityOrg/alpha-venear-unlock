@@ -2,8 +2,10 @@
 
 import { WalletProvider, useWallet } from "@/contexts/WalletContext";
 import { useVenearContract } from "@/hooks/useVenearContract";
+import { useStakingPool } from "@/hooks/useStakingPool";
 import { WalletConnection } from "@/components/WalletConnection";
 import { VenearBalance } from "@/components/VenearBalance";
+import { StakingStatusCard } from "@/components/StakingStatusCard";
 import { UnlockActions } from "@/components/UnlockActions";
 import { PublicAccountsList } from "@/components/PublicAccountsList";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -23,6 +25,14 @@ function AppContent() {
     endUnlock,
     transferToAccount,
   } = useVenearContract();
+
+  const {
+    stakingInfo,
+    loading: stakingLoading,
+    error: stakingError,
+    unstakeAll,
+    withdrawFromStakingPool,
+  } = useStakingPool(lockupAccountId);
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -58,11 +68,20 @@ function AppContent() {
                   error={error}
                 />
 
+                <StakingStatusCard
+                  stakingInfo={stakingInfo}
+                  loading={stakingLoading}
+                  error={stakingError}
+                  onUnstake={unstakeAll}
+                  onWithdraw={withdrawFromStakingPool}
+                />
+
                 <UnlockActions
                   lockedBalance={lockedBalance}
                   pendingBalance={pendingBalance}
                   liquidBalance={liquidBalance}
                   unlockTimestamp={unlockTimestamp}
+                  stakingInfo={stakingInfo}
                   loading={loading}
                   error={error}
                   onBeginUnlock={beginUnlock}
