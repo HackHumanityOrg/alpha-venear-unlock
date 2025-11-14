@@ -1,40 +1,11 @@
-"use client";
-
-import { WalletProvider, useWallet } from "@/contexts/WalletContext";
-import { useVenearContract } from "@/hooks/useVenearContract";
-import { useStakingPool } from "@/hooks/useStakingPool";
-import { WalletConnection } from "@/components/WalletConnection";
-import { VenearBalance } from "@/components/VenearBalance";
-import { StakingStatusCard } from "@/components/StakingStatusCard";
-import { UnlockActions } from "@/components/UnlockActions";
+import { Suspense } from "react";
+import { WalletProvider } from "@/contexts/WalletContext";
 import { PublicAccountsList } from "@/components/PublicAccountsList";
+import { PublicAccountsListSkeleton } from "@/components/PublicAccountsListSkeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { TestAccountSelector } from "@/components/TestAccountSelector";
+import { ClientPageContent } from "@/components/ClientPageContent";
 
 function AppContent() {
-  const { accountId } = useWallet();
-  const {
-    lockedBalance,
-    pendingBalance,
-    liquidBalance,
-    unlockTimestamp,
-    lockupAccountId,
-    lockupNotCreated,
-    loading,
-    error,
-    beginUnlock,
-    endUnlock,
-    transferToAccount,
-  } = useVenearContract();
-
-  const {
-    stakingInfo,
-    loading: stakingLoading,
-    error: stakingError,
-    unstakeAll,
-    withdrawFromStakingPool,
-  } = useStakingPool(lockupAccountId);
-
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="container max-w-7xl mx-auto space-y-6">
@@ -54,48 +25,12 @@ function AppContent() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <div className="space-y-6">
-            <TestAccountSelector />
-            <WalletConnection />
-
-            {accountId && (
-              <>
-                <VenearBalance
-                  lockedBalance={lockedBalance}
-                  pendingBalance={pendingBalance}
-                  liquidBalance={liquidBalance}
-                  unlockTimestamp={unlockTimestamp}
-                  lockupAccountId={lockupAccountId}
-                  lockupNotCreated={lockupNotCreated}
-                  error={error}
-                />
-
-                <StakingStatusCard
-                  stakingInfo={stakingInfo}
-                  loading={stakingLoading}
-                  error={stakingError}
-                  onUnstake={unstakeAll}
-                  onWithdraw={withdrawFromStakingPool}
-                />
-
-                <UnlockActions
-                  lockedBalance={lockedBalance}
-                  pendingBalance={pendingBalance}
-                  liquidBalance={liquidBalance}
-                  unlockTimestamp={unlockTimestamp}
-                  stakingInfo={stakingInfo}
-                  loading={loading}
-                  error={error}
-                  onBeginUnlock={beginUnlock}
-                  onEndUnlock={endUnlock}
-                  onTransfer={transferToAccount}
-                />
-              </>
-            )}
-          </div>
+          <ClientPageContent />
 
           <div className="min-h-screen">
-            <PublicAccountsList />
+            <Suspense fallback={<PublicAccountsListSkeleton />}>
+              <PublicAccountsList />
+            </Suspense>
           </div>
         </div>
       </div>
