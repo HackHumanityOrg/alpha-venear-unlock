@@ -11,6 +11,7 @@ import { setupHereWallet } from "@near-wallet-selector/here-wallet";
 import { setupLedger } from "@near-wallet-selector/ledger";
 
 import "@near-wallet-selector/modal-ui/styles.css";
+import type { TestAccount } from "@/lib/testAccounts";
 
 const VENEAR_CONTRACT_ID = "v.voteagora.near";
 
@@ -21,6 +22,9 @@ interface WalletContextType {
   accountId: string | null;
   signIn: () => void;
   signOut: () => void;
+  isTestMode: boolean;
+  testAccount: TestAccount | null;
+  setTestAccount: (account: TestAccount | null) => void;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -29,6 +33,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [selector, setSelector] = useState<WalletSelector | null>(null);
   const [modal, setModal] = useState<WalletSelectorModal | null>(null);
   const [accounts, setAccounts] = useState<Array<AccountState>>([]);
+  const [testAccount, setTestAccount] = useState<TestAccount | null>(null);
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
@@ -76,10 +81,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [selector]);
 
   const activeAccount = accounts.find((account) => account.active);
-  const accountId = activeAccount?.accountId ?? null;
+  const walletAccountId = activeAccount?.accountId ?? null;
+
+  // Use test account if set, otherwise use wallet account
+  const accountId = testAccount ? testAccount.accountId : walletAccountId;
+  const isTestMode = testAccount !== null;
 
   return (
-    <WalletContext.Provider value={{ selector, modal, accounts, accountId, signIn, signOut }}>
+    <WalletContext.Provider
+      value={{
+        selector,
+        modal,
+        accounts,
+        accountId,
+        signIn,
+        signOut,
+        isTestMode,
+        testAccount,
+        setTestAccount,
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );

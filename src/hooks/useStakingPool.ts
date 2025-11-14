@@ -9,7 +9,7 @@ import { fetchStakingPoolInfo } from "@/lib/stakingPoolUtils";
 import type { StakingPoolInfo } from "@/types/venear";
 
 export function useStakingPool(lockupAccountId: string | null) {
-  const { selector, accountId } = useWallet();
+  const { selector, accountId, isTestMode } = useWallet();
   const [stakingInfo, setStakingInfo] = useState<StakingPoolInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +56,10 @@ export function useStakingPool(lockupAccountId: string | null) {
   }, [lockupAccountId, fetchStakingInfo]);
 
   const unstakeAll = useCallback(async () => {
+    if (isTestMode) {
+      throw new Error("Transactions are disabled in test mode");
+    }
+
     if (!selector || !accountId || !lockupAccountId)
       throw new Error("Wallet not connected or lockup account not loaded");
 
@@ -84,9 +88,13 @@ export function useStakingPool(lockupAccountId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [selector, accountId, lockupAccountId, stakingInfo, fetchStakingInfo]);
+  }, [selector, accountId, lockupAccountId, stakingInfo, fetchStakingInfo, isTestMode]);
 
   const withdrawFromStakingPool = useCallback(async () => {
+    if (isTestMode) {
+      throw new Error("Transactions are disabled in test mode");
+    }
+
     if (!selector || !accountId || !lockupAccountId)
       throw new Error("Wallet not connected or lockup account not loaded");
 
@@ -122,7 +130,7 @@ export function useStakingPool(lockupAccountId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [selector, accountId, lockupAccountId, stakingInfo, fetchStakingInfo]);
+  }, [selector, accountId, lockupAccountId, stakingInfo, fetchStakingInfo, isTestMode]);
 
   return {
     stakingInfo,

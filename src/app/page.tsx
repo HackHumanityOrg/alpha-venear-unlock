@@ -9,6 +9,7 @@ import { StakingStatusCard } from "@/components/StakingStatusCard";
 import { UnlockActions } from "@/components/UnlockActions";
 import { PublicAccountsList } from "@/components/PublicAccountsList";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { TestAccountSelector } from "@/components/TestAccountSelector";
 
 function AppContent() {
   const { accountId } = useWallet();
@@ -54,6 +55,7 @@ function AppContent() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <div className="space-y-6">
+            <TestAccountSelector />
             <WalletConnection />
 
             {accountId && (

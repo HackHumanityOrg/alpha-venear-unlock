@@ -41,7 +41,7 @@ const parseNearAmount = (amount: string): string => {
 };
 
 export function useVenearContract() {
-  const { selector, accountId } = useWallet();
+  const { selector, accountId, isTestMode, testAccount } = useWallet();
   const [balance, setBalance] = useState<VenearBalance>({
     locked: "0",
     pending: "0",
@@ -75,17 +75,25 @@ export function useVenearContract() {
       return;
     }
 
+    // If in test mode, use the hardcoded lockup account ID
+    if (isTestMode && testAccount) {
+      setLockupAccountId(testAccount.lockupAccountId);
+      return;
+    }
+
     fetchLockupAccountId(accountId)
       .then(setLockupAccountId)
       .catch((err) => {
         console.error("Failed to fetch lockup account ID:", err);
         setError("Failed to fetch lockup account ID");
       });
-  }, [accountId, fetchLockupAccountId]);
+  }, [accountId, fetchLockupAccountId, isTestMode, testAccount]);
 
   const fetchBalances = useCallback(
     async (signal?: AbortSignal) => {
-      if (!accountId || !selector || !lockupAccountId) return;
+      if (!accountId || !lockupAccountId) return;
+      // In test mode, we don't need selector since we only use provider
+      if (!isTestMode && !selector) return;
 
       try {
         const lockupExists = await checkAccountExists(lockupAccountId);
@@ -200,7 +208,7 @@ export function useVenearContract() {
         setError("Failed to fetch balances. Please try again.");
       }
     },
-    [accountId, selector, lockupAccountId],
+    [accountId, selector, lockupAccountId, isTestMode],
   );
 
   useEffect(() => {
@@ -221,6 +229,10 @@ export function useVenearContract() {
 
   const beginUnlock = useCallback(
     async (amount?: string) => {
+      if (isTestMode) {
+        throw new Error("Transactions are disabled in test mode");
+      }
+
       if (!selector || !accountId || !lockupAccountId)
         throw new Error("Wallet not connected or lockup account not loaded");
 
@@ -259,11 +271,15 @@ export function useVenearContract() {
         setLoading(false);
       }
     },
-    [selector, accountId, lockupAccountId, balance.locked, fetchBalances],
+    [selector, accountId, lockupAccountId, balance.locked, fetchBalances, isTestMode],
   );
 
   const endUnlock = useCallback(
     async (amount?: string) => {
+      if (isTestMode) {
+        throw new Error("Transactions are disabled in test mode");
+      }
+
       if (!selector || !accountId || !lockupAccountId)
         throw new Error("Wallet not connected or lockup account not loaded");
 
@@ -307,11 +323,15 @@ export function useVenearContract() {
         setLoading(false);
       }
     },
-    [selector, accountId, lockupAccountId, balance.pending, fetchBalances],
+    [selector, accountId, lockupAccountId, balance.pending, fetchBalances, isTestMode],
   );
 
   const transferToAccount = useCallback(
     async (amountYocto: string, receiverId?: string) => {
+      if (isTestMode) {
+        throw new Error("Transactions are disabled in test mode");
+      }
+
       if (!selector || !accountId || !lockupAccountId)
         throw new Error("Wallet not connected or lockup account not loaded");
 
@@ -362,7 +382,7 @@ export function useVenearContract() {
         setLoading(false);
       }
     },
-    [selector, accountId, lockupAccountId, balance.liquid, fetchBalances],
+    [selector, accountId, lockupAccountId, balance.liquid, fetchBalances, isTestMode],
   );
 
   return {
