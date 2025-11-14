@@ -17,20 +17,24 @@ function AppContent() {
     unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
-    stakingPoolInfo,
-    stakingStatus,
     loading,
     error,
     beginUnlock,
     endUnlock,
-    unstakeAll,
-    withdrawFromStakingPool,
     transferToAccount,
   } = useVenearContract();
 
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="container max-w-7xl mx-auto space-y-6">
+        {/* Beta Banner */}
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 text-center">
+          <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+            This application is currently under beta testing. Please use with caution and verify all
+            transactions.
+          </p>
+        </div>
+
         <div className="text-center space-y-2 py-4">
           <h1 className="text-4xl font-bold">veNEAR Unlock</h1>
           <p className="text-muted-foreground">
@@ -51,10 +55,6 @@ function AppContent() {
                   unlockTimestamp={unlockTimestamp}
                   lockupAccountId={lockupAccountId}
                   lockupNotCreated={lockupNotCreated}
-                  stakingStatus={stakingStatus}
-                  stakedBalance={stakingPoolInfo.stakedBalance}
-                  unstakedBalance={stakingPoolInfo.unstakedBalance}
-                  stakingPoolId={stakingPoolInfo.stakingPoolId}
                   error={error}
                 />
 
@@ -63,16 +63,10 @@ function AppContent() {
                   pendingBalance={pendingBalance}
                   liquidBalance={liquidBalance}
                   unlockTimestamp={unlockTimestamp}
-                  stakingStatus={stakingStatus}
-                  stakedBalance={stakingPoolInfo.stakedBalance}
-                  unstakedBalance={stakingPoolInfo.unstakedBalance}
-                  canWithdrawFromPool={stakingPoolInfo.canWithdraw}
                   loading={loading}
                   error={error}
                   onBeginUnlock={beginUnlock}
                   onEndUnlock={endUnlock}
-                  onUnstake={unstakeAll}
-                  onWithdrawFromPool={withdrawFromStakingPool}
                   onTransfer={transferToAccount}
                 />
               </>
