@@ -49,6 +49,7 @@ export function useVenearContract() {
     liquid: "0",
     accountBalance: "0",
   });
+  const [dataLoading, setDataLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lockupAccountId, setLockupAccountId] = useState<string | null>(null);
@@ -106,6 +107,7 @@ export function useVenearContract() {
             unlockTimestamp: null,
           });
           setError(null);
+          setDataLoading(false);
           return;
         }
 
@@ -202,10 +204,12 @@ export function useVenearContract() {
         });
 
         setError(null);
+        setDataLoading(false);
       } catch (err) {
         if (signal?.aborted) return;
         console.error("Failed to fetch balances:", err);
         setError("Failed to fetch balances. Please try again.");
+        setDataLoading(false);
       }
     },
     [accountId, selector, lockupAccountId, isTestMode],
@@ -213,9 +217,11 @@ export function useVenearContract() {
 
   useEffect(() => {
     if (!accountId) {
+      setDataLoading(false);
       return () => {};
     }
 
+    setDataLoading(true);
     const controller = new AbortController();
 
     fetchBalances(controller.signal);
@@ -432,6 +438,7 @@ export function useVenearContract() {
     unlockTimestamp: balance.unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
+    dataLoading,
     loading,
     error,
     beginUnlock,

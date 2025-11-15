@@ -11,6 +11,7 @@ import type { StakingPoolInfo } from "@/types/venear";
 export function useStakingPool(lockupAccountId: string | null) {
   const { selector, accountId, isTestMode } = useWallet();
   const [stakingInfo, setStakingInfo] = useState<StakingPoolInfo | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,6 +19,7 @@ export function useStakingPool(lockupAccountId: string | null) {
     async (signal?: AbortSignal) => {
       if (!lockupAccountId) {
         setStakingInfo(null);
+        setDataLoading(false);
         return;
       }
 
@@ -28,11 +30,13 @@ export function useStakingPool(lockupAccountId: string | null) {
 
         setStakingInfo(info);
         setError(null);
+        setDataLoading(false);
       } catch (err) {
         if (signal?.aborted) return;
         console.error("Failed to fetch staking info:", err);
         setError("Failed to fetch staking pool information");
         setStakingInfo(null);
+        setDataLoading(false);
       }
     },
     [lockupAccountId],
@@ -41,9 +45,11 @@ export function useStakingPool(lockupAccountId: string | null) {
   useEffect(() => {
     if (!lockupAccountId) {
       setStakingInfo(null);
+      setDataLoading(false);
       return () => {};
     }
 
+    setDataLoading(true);
     const controller = new AbortController();
 
     fetchStakingInfo(controller.signal);
@@ -134,6 +140,7 @@ export function useStakingPool(lockupAccountId: string | null) {
 
   return {
     stakingInfo,
+    dataLoading,
     loading,
     error,
     unstakeAll,

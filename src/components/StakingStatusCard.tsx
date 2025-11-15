@@ -31,7 +31,7 @@ export function StakingStatusCard({
 
   const hasStaked = Big(stakingInfo.stakedBalance).gt(0);
   const hasUnstaking = Big(stakingInfo.unstakedBalance).gt(0) && stakingInfo.isUnstaking;
-  const hasAvailable = Big(stakingInfo.availableBalance || "0").gt(0) && stakingInfo.canWithdraw;
+  const hasAvailable = Big(stakingInfo.unstakedBalance || "0").gt(0) && stakingInfo.canWithdraw;
 
   const handleUnstake = async () => {
     try {
@@ -153,7 +153,7 @@ export function StakingStatusCard({
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground font-medium">Available to Withdraw</p>
             <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
-              {stakingInfo.availableBalance}{" "}
+              {stakingInfo.unstakedBalance}{" "}
               <span className="text-lg text-muted-foreground">NEAR</span>
             </p>
             <Button

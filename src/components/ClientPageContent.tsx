@@ -5,8 +5,11 @@ import { useVenearContract } from "@/hooks/useVenearContract";
 import { useStakingPool } from "@/hooks/useStakingPool";
 import { WalletConnection } from "@/components/WalletConnection";
 import { VenearBalance } from "@/components/VenearBalance";
+import { VenearBalanceSkeleton } from "@/components/VenearBalanceSkeleton";
 import { StakingStatusCard } from "@/components/StakingStatusCard";
+import { StakingStatusCardSkeleton } from "@/components/StakingStatusCardSkeleton";
 import { UnlockActions } from "@/components/UnlockActions";
+import { UnlockActionsSkeleton } from "@/components/UnlockActionsSkeleton";
 import { TestAccountSelector } from "@/components/TestAccountSelector";
 
 /**
@@ -22,6 +25,7 @@ export function ClientPageContent() {
     unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
+    dataLoading,
     loading,
     error,
     beginUnlock,
@@ -32,6 +36,7 @@ export function ClientPageContent() {
 
   const {
     stakingInfo,
+    dataLoading: stakingDataLoading,
     loading: stakingLoading,
     error: stakingError,
     unstakeAll,
@@ -45,37 +50,49 @@ export function ClientPageContent() {
 
       {accountId && (
         <>
-          <VenearBalance
-            lockedBalance={lockedBalance}
-            pendingBalance={pendingBalance}
-            liquidBalance={liquidBalance}
-            unlockTimestamp={unlockTimestamp}
-            lockupAccountId={lockupAccountId}
-            lockupNotCreated={lockupNotCreated}
-            error={error}
-          />
+          {dataLoading ? (
+            <VenearBalanceSkeleton />
+          ) : (
+            <VenearBalance
+              lockedBalance={lockedBalance}
+              pendingBalance={pendingBalance}
+              liquidBalance={liquidBalance}
+              unlockTimestamp={unlockTimestamp}
+              lockupAccountId={lockupAccountId}
+              lockupNotCreated={lockupNotCreated}
+              error={error}
+            />
+          )}
 
-          <StakingStatusCard
-            stakingInfo={stakingInfo}
-            loading={stakingLoading}
-            error={stakingError}
-            onUnstake={unstakeAll}
-            onWithdraw={withdrawFromStakingPool}
-          />
+          {stakingDataLoading && lockupAccountId ? (
+            <StakingStatusCardSkeleton />
+          ) : (
+            <StakingStatusCard
+              stakingInfo={stakingInfo}
+              loading={stakingLoading}
+              error={stakingError}
+              onUnstake={unstakeAll}
+              onWithdraw={withdrawFromStakingPool}
+            />
+          )}
 
-          <UnlockActions
-            lockedBalance={lockedBalance}
-            pendingBalance={pendingBalance}
-            liquidBalance={liquidBalance}
-            unlockTimestamp={unlockTimestamp}
-            stakingInfo={stakingInfo}
-            loading={loading}
-            error={error}
-            onBeginUnlock={beginUnlock}
-            onEndUnlock={endUnlock}
-            onTransfer={transferToAccount}
-            onDeleteLockup={deleteLockup}
-          />
+          {dataLoading ? (
+            <UnlockActionsSkeleton />
+          ) : (
+            <UnlockActions
+              lockedBalance={lockedBalance}
+              pendingBalance={pendingBalance}
+              liquidBalance={liquidBalance}
+              unlockTimestamp={unlockTimestamp}
+              stakingInfo={stakingInfo}
+              loading={loading}
+              error={error}
+              onBeginUnlock={beginUnlock}
+              onEndUnlock={endUnlock}
+              onTransfer={transferToAccount}
+              onDeleteLockup={deleteLockup}
+            />
+          )}
         </>
       )}
     </div>

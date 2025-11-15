@@ -34,45 +34,29 @@ export async function fetchStakingPoolInfo(
   }
 
   // Fetch pool balances
-  const [stakedResult, unstakedResult, availableResult, isAvailableResult] =
-    await Promise.allSettled([
-      provider.query({
-        request_type: "call_function",
-        finality: "final",
-        account_id: poolId,
-        method_name: "get_account_staked_balance",
-        args_base64: Buffer.from(JSON.stringify({ account_id: lockupAccountId })).toString(
-          "base64",
-        ),
-      }),
-      provider.query({
-        request_type: "call_function",
-        finality: "final",
-        account_id: poolId,
-        method_name: "get_account_unstaked_balance",
-        args_base64: Buffer.from(JSON.stringify({ account_id: lockupAccountId })).toString(
-          "base64",
-        ),
-      }),
-      provider.query({
-        request_type: "call_function",
-        finality: "final",
-        account_id: poolId,
-        method_name: "get_account_available_balance",
-        args_base64: Buffer.from(JSON.stringify({ account_id: lockupAccountId })).toString(
-          "base64",
-        ),
-      }),
-      provider.query({
-        request_type: "call_function",
-        finality: "final",
-        account_id: poolId,
-        method_name: "is_account_unstaked_balance_available",
-        args_base64: Buffer.from(JSON.stringify({ account_id: lockupAccountId })).toString(
-          "base64",
-        ),
-      }),
-    ]);
+  const [stakedResult, unstakedResult, isAvailableResult] = await Promise.allSettled([
+    provider.query({
+      request_type: "call_function",
+      finality: "final",
+      account_id: poolId,
+      method_name: "get_account_staked_balance",
+      args_base64: Buffer.from(JSON.stringify({ account_id: lockupAccountId })).toString("base64"),
+    }),
+    provider.query({
+      request_type: "call_function",
+      finality: "final",
+      account_id: poolId,
+      method_name: "get_account_unstaked_balance",
+      args_base64: Buffer.from(JSON.stringify({ account_id: lockupAccountId })).toString("base64"),
+    }),
+    provider.query({
+      request_type: "call_function",
+      finality: "final",
+      account_id: poolId,
+      method_name: "is_account_unstaked_balance_available",
+      args_base64: Buffer.from(JSON.stringify({ account_id: lockupAccountId })).toString("base64"),
+    }),
+  ]);
 
   const stakedBalance =
     stakedResult.status === "fulfilled"
@@ -82,11 +66,6 @@ export async function fetchStakingPoolInfo(
   const unstakedBalance =
     unstakedResult.status === "fulfilled"
       ? JSON.parse(Buffer.from((unstakedResult.value as unknown as QueryResult).result).toString())
-      : "0";
-
-  const availableBalance =
-    availableResult.status === "fulfilled"
-      ? JSON.parse(Buffer.from((availableResult.value as unknown as QueryResult).result).toString())
       : "0";
 
   const isAvailable =
@@ -99,7 +78,6 @@ export async function fetchStakingPoolInfo(
   // Convert to NEAR and format
   const stakedNear = Big(stakedBalance).div(Big(10).pow(24)).toFixed(2);
   const unstakedNear = Big(unstakedBalance).div(Big(10).pow(24)).toFixed(2);
-  const availableNear = Big(availableBalance).div(Big(10).pow(24)).toFixed(2);
 
   // Determine staking status
   const hasUnstakedBalance = parseFloat(unstakedNear) > 0;
@@ -110,7 +88,7 @@ export async function fetchStakingPoolInfo(
     stakingPoolId: poolId,
     stakedBalance: stakedNear,
     unstakedBalance: unstakedNear,
-    availableBalance: availableNear,
+    availableBalance: unstakedNear, // Use unstakedBalance for compatibility
     canWithdraw: canWithdrawFromPool,
     isUnstaking: isCurrentlyUnstaking,
   };
