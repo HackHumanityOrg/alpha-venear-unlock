@@ -26,8 +26,13 @@ interface UnlockActionsProps {
   error: string | null;
   onBeginUnlock: () => Promise<void>;
   onEndUnlock: () => Promise<void>;
-  onTransfer?: (amountYocto: string) => Promise<void>;
+  onTransfer?: (
+    amountYocto: string,
+    receiverId?: string,
+    options?: { includeAllDust?: boolean },
+  ) => Promise<void>;
   onDeleteLockup?: () => Promise<void>;
+  onCleanupDust?: (unlockTimestamp: string | null) => Promise<void>;
 }
 
 export function UnlockActions({
@@ -42,11 +47,13 @@ export function UnlockActions({
   onEndUnlock,
   onTransfer,
   onDeleteLockup,
+  onCleanupDust,
 }: UnlockActionsProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [cleanupInProgress, setCleanupInProgress] = useState(false);
 
   const threshold = Big(10).pow(20);
   const hasLocked = Big(lockedBalance).gt(threshold);
@@ -65,9 +72,18 @@ export function UnlockActions({
 
   const hasFundsInPool = totalInPool.gt(0.01);
 
-  // Check if lockup can be deleted (all balances are zero or negligible, no staking)
+  // Check if lockup can be deleted - requires EXACTLY zero balances (no dust allowed)
+  // The smart contract enforces strict zero balance, even for yoctoNEAR dust
+  const hasAnyLockedBalance = Big(lockedBalance).gt(0);
+  const hasAnyPendingBalance = Big(pendingBalance).gt(0);
+  const hasAnyLiquidBalance = Big(liquidBalance || "0").gt(0);
+
   const canDeleteLockup =
-    !hasLocked && !hasPending && !hasLiquid && !hasFundsInPool && onDeleteLockup !== undefined;
+    !hasAnyLockedBalance &&
+    !hasAnyPendingBalance &&
+    !hasAnyLiquidBalance &&
+    !hasFundsInPool &&
+    onDeleteLockup !== undefined;
 
   const handleBeginUnlock = async () => {
     try {
@@ -93,8 +109,8 @@ export function UnlockActions({
     try {
       setActionError(null);
       setShowTransferConfirm(false);
-      // Transfer all liquid balance to user's wallet
-      await onTransfer(liquidBalance || "0");
+      // Transfer all liquid balance to user's wallet, including any dust
+      await onTransfer(liquidBalance || "0", undefined, { includeAllDust: true });
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Failed to transfer");
     }
@@ -107,7 +123,34 @@ export function UnlockActions({
       setShowDeleteConfirm(false);
       await onDeleteLockup();
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete lockup");
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete lockup";
+
+      // Enhanced error messages for common issues
+      if (
+        errorMessage.includes("non-zero locked") ||
+        errorMessage.includes("non-zero balance") ||
+        errorMessage.includes("panicked at lockup-contract")
+      ) {
+        setActionError(
+          "Deletion failed: Your lockup contract still has remaining balances (possibly dust amounts). " +
+            "Ensure all locked, pending, and liquid balances are exactly zero. Check the warnings above for guidance.",
+        );
+      } else {
+        setActionError(errorMessage);
+      }
+    }
+  };
+
+  const handleCleanupDust = async () => {
+    if (!onCleanupDust) return;
+    try {
+      setActionError(null);
+      setCleanupInProgress(true);
+      await onCleanupDust(unlockTimestamp);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to clean up dust");
+    } finally {
+      setCleanupInProgress(false);
     }
   };
 
@@ -275,6 +318,107 @@ export function UnlockActions({
           </div>
         )}
 
+        {/* Dust Balance Warning - appears when balances are too small to display but block deletion */}
+        {!canDeleteLockup &&
+          !hasLocked &&
+          !hasPending &&
+          !hasLiquid &&
+          !hasFundsInPool &&
+          (hasAnyLockedBalance || hasAnyPendingBalance || hasAnyLiquidBalance) &&
+          onDeleteLockup && (
+            <Alert variant="default" className="bg-amber-50 dark:bg-amber-950/20 border-amber-200">
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p className="font-semibold text-amber-800 dark:text-amber-200">
+                    ⚠️ Dust Balance Detected
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Your lockup contract has negligible dust amounts (less than 0.0001 NEAR) that
+                    prevent deletion. The smart contract requires EXACTLY zero balances.
+                  </p>
+                  {hasAnyLockedBalance && (
+                    <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
+                      Locked: {lockedBalance} yoctoNEAR
+                    </p>
+                  )}
+                  {hasAnyPendingBalance && (
+                    <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
+                      Pending: {pendingBalance} yoctoNEAR
+                    </p>
+                  )}
+                  {hasAnyLiquidBalance && (
+                    <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
+                      Liquid: {liquidBalance} yoctoNEAR
+                    </p>
+                  )}
+
+                  {onCleanupDust && (
+                    <div className="mt-4">
+                      <Button
+                        onClick={handleCleanupDust}
+                        disabled={loading || cleanupInProgress}
+                        className="w-full bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600"
+                        size="sm"
+                      >
+                        {cleanupInProgress
+                          ? "Cleaning Up Dust..."
+                          : "Automatically Clean Up All Dust"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+        {/* Pre-Deletion Checklist - appears when preparing for deletion */}
+        {!canDeleteLockup &&
+          !hasLocked &&
+          !hasPending &&
+          !hasLiquid &&
+          !hasFundsInPool &&
+          !hasAnyLockedBalance &&
+          !hasAnyPendingBalance &&
+          !hasAnyLiquidBalance &&
+          onDeleteLockup && (
+            <Alert variant="default" className="bg-green-50 dark:bg-green-950/20 border-green-200">
+              <AlertDescription>
+                <div className="space-y-3">
+                  <p className="font-semibold text-green-800 dark:text-green-200">
+                    ✓ Ready to Delete Lockup Contract
+                  </p>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    All balances are exactly zero. You can now safely delete the lockup contract to
+                    recover your ~2 NEAR deployment funds.
+                  </p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-green-800 dark:text-green-200">
+                      Pre-deletion Checklist:
+                    </p>
+                    <ul className="text-xs text-green-700 dark:text-green-300 space-y-1">
+                      <li className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Locked balance: 0 yoctoNEAR</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Pending balance: 0 yoctoNEAR</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Liquid balance: 0 yoctoNEAR</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>No funds in staking pool</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
         {/* Delete Lockup - Final Step */}
         {canDeleteLockup && (
           <div className="space-y-2">
@@ -323,6 +467,7 @@ export function UnlockActions({
                           disabled={loading}
                           variant="destructive"
                           size="sm"
+                          className="text-white"
                         >
                           {loading ? "Deleting..." : "Yes, Delete Contract"}
                         </Button>

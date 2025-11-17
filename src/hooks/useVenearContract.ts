@@ -333,7 +333,7 @@ export function useVenearContract() {
   );
 
   const transferToAccount = useCallback(
-    async (amountYocto: string, receiverId?: string) => {
+    async (amountYocto: string, receiverId?: string, options?: { includeAllDust?: boolean }) => {
       if (isTestMode) {
         throw new Error("Transactions are disabled in test mode");
       }
@@ -341,27 +341,45 @@ export function useVenearContract() {
       if (!selector || !accountId || !lockupAccountId)
         throw new Error("Wallet not connected or lockup account not loaded");
 
-      // Validate the yocto amount
-      try {
-        const amountBig = Big(amountYocto);
-        if (amountBig.lte(0)) {
-          throw new Error("Invalid amount: must be greater than zero");
-        }
-        if (amountBig.gt(Big(balance.liquid || "0"))) {
-          throw new Error(
-            `Amount exceeds liquid balance of ${formatNearAmount(balance.liquid || "0")} NEAR`,
-          );
-        }
-      } catch {
-        throw new Error("Invalid amount format");
-      }
-
-      const recipient = receiverId || accountId;
-
       setLoading(true);
       setError(null);
 
       try {
+        // Fetch fresh balance before transfer to get exact amount
+        const provider = getSharedProvider();
+        const liquidResult = await provider.query({
+          request_type: "call_function",
+          finality: "final",
+          account_id: lockupAccountId,
+          method_name: "get_liquid_owners_balance",
+          args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
+        });
+        const actualLiquidBalance = JSON.parse(
+          Buffer.from((liquidResult as unknown as QueryResult).result).toString(),
+        );
+
+        // Smart amount handling
+        let finalAmount = amountYocto;
+        const requestedBig = Big(amountYocto);
+        const actualBig = Big(actualLiquidBalance);
+
+        // If requesting all or very close to actual balance, use exact actual balance
+        if (options?.includeAllDust || requestedBig.minus(actualBig).abs().lte(1000)) {
+          finalAmount = actualLiquidBalance;
+        }
+
+        // Validate the final amount
+        const finalBig = Big(finalAmount);
+        if (finalBig.lte(0)) {
+          throw new Error("Invalid amount: must be greater than zero");
+        }
+        if (finalBig.gt(actualBig)) {
+          throw new Error(
+            `Amount ${formatNearAmount(finalAmount)} exceeds liquid balance of ${formatNearAmount(actualLiquidBalance)} NEAR`,
+          );
+        }
+
+        const recipient = receiverId || accountId;
         const wallet = await selector.wallet();
 
         await wallet.signAndSendTransaction({
@@ -370,7 +388,7 @@ export function useVenearContract() {
             actionCreators.functionCall(
               "transfer",
               {
-                amount: amountYocto,
+                amount: finalAmount,
                 receiver_id: recipient,
               },
               MAX_GAS,
@@ -388,7 +406,7 @@ export function useVenearContract() {
         setLoading(false);
       }
     },
-    [selector, accountId, lockupAccountId, balance.liquid, fetchBalances, isTestMode],
+    [selector, accountId, lockupAccountId, fetchBalances, isTestMode],
   );
 
   const deleteLockup = useCallback(async () => {
@@ -430,6 +448,91 @@ export function useVenearContract() {
     }
   }, [selector, accountId, lockupAccountId, isTestMode]);
 
+  const detectDust = useCallback(() => {
+    const lockedBig = Big(balance.locked || "0");
+    const pendingBig = Big(balance.pending || "0");
+    const liquidBig = Big(balance.liquid || "0");
+
+    return {
+      hasLockedDust: lockedBig.gt(0) && lockedBig.lt(Big(10).pow(20)),
+      hasPendingDust: pendingBig.gt(0) && pendingBig.lt(Big(10).pow(20)),
+      hasLiquidDust: liquidBig.gt(0) && liquidBig.lt(Big(10).pow(20)),
+      lockedAmount: balance.locked || "0",
+      pendingAmount: balance.pending || "0",
+      liquidAmount: balance.liquid || "0",
+    };
+  }, [balance]);
+
+  const cleanupDustBalances = useCallback(
+    async (unlockTimestamp: string | null) => {
+      if (isTestMode) {
+        throw new Error("Transactions are disabled in test mode");
+      }
+
+      if (!selector || !accountId || !lockupAccountId)
+        throw new Error("Wallet not connected or lockup account not loaded");
+
+      const dust = detectDust();
+      const operations: Array<() => Promise<void>> = [];
+
+      // Step 1: Unlock any locked dust
+      if (dust.hasLockedDust || Big(balance.locked).gt(0)) {
+        operations.push(async () => {
+          console.log("Cleaning up locked dust:", balance.locked);
+          await beginUnlock(); // Passing no amount = unlock all
+        });
+      }
+
+      // Step 2: Complete unlock for pending dust (if unlock period is done)
+      if ((dust.hasPendingDust || Big(balance.pending).gt(0)) && unlockTimestamp) {
+        const isReady = parseInt(unlockTimestamp) <= Date.now() * 1000000;
+        if (isReady) {
+          operations.push(async () => {
+            console.log("Completing unlock for pending dust:", balance.pending);
+            await endUnlock(); // Passing no amount = unlock all
+          });
+        }
+      }
+
+      // Step 3: Transfer any liquid dust
+      if (dust.hasLiquidDust || Big(balance.liquid || "0").gt(0)) {
+        operations.push(async () => {
+          console.log("Transferring liquid dust:", balance.liquid);
+          await transferToAccount(balance.liquid || "0", undefined, { includeAllDust: true });
+        });
+      }
+
+      // Execute operations sequentially
+      for (const operation of operations) {
+        try {
+          await operation();
+          // Wait a bit for transaction to process
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+          // Refresh balances after each step
+          await fetchBalances();
+        } catch (err) {
+          console.error("Cleanup operation failed:", err);
+          throw err;
+        }
+      }
+
+      // Final balance refresh
+      await fetchBalances();
+    },
+    [
+      isTestMode,
+      selector,
+      accountId,
+      lockupAccountId,
+      detectDust,
+      balance,
+      beginUnlock,
+      endUnlock,
+      transferToAccount,
+      fetchBalances,
+    ],
+  );
+
   return {
     lockedBalance: balance.locked,
     pendingBalance: balance.pending,
@@ -445,6 +548,7 @@ export function useVenearContract() {
     endUnlock,
     transferToAccount,
     deleteLockup,
+    cleanupDustBalances,
     refreshBalances: fetchBalances,
   };
 }

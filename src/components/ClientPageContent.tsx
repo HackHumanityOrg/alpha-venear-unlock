@@ -32,6 +32,7 @@ export function ClientPageContent() {
     endUnlock,
     transferToAccount,
     deleteLockup,
+    cleanupDustBalances,
   } = useVenearContract();
 
   const {
@@ -91,6 +92,7 @@ export function ClientPageContent() {
               onEndUnlock={endUnlock}
               onTransfer={transferToAccount}
               onDeleteLockup={deleteLockup}
+              onCleanupDust={cleanupDustBalances}
             />
           )}
         </>
