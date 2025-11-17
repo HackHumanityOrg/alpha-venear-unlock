@@ -48,9 +48,10 @@ export function UnlockActions({
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const hasLocked = Big(lockedBalance).gt(0);
-  const hasPending = Big(pendingBalance).gt(0);
-  const hasLiquid = Big(liquidBalance || "0").gt(Big(10).pow(20)); // 0.0001 NEAR in yocto
+  const threshold = Big(10).pow(20);
+  const hasLocked = Big(lockedBalance).gt(threshold);
+  const hasPending = Big(pendingBalance).gt(threshold);
+  const hasLiquid = Big(liquidBalance || "0").gt(threshold);
   const hasUnlockPending = unlockTimestamp && unlockTimestamp !== "0";
 
   // Check if unlock period is complete - NOT blocked by staking
@@ -61,7 +62,8 @@ export function UnlockActions({
   const totalInPool = stakingInfo
     ? Big(stakingInfo.stakedBalance || "0").plus(Big(stakingInfo.unstakedBalance || "0"))
     : Big(0);
-  const hasFundsInPool = totalInPool.gt(0);
+
+  const hasFundsInPool = totalInPool.gt(0.01);
 
   // Check if lockup can be deleted (all balances are zero or negligible, no staking)
   const canDeleteLockup =

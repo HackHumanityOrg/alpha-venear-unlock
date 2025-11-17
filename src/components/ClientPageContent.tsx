@@ -76,7 +76,7 @@ export function ClientPageContent() {
             />
           )}
 
-          {dataLoading ? (
+          {dataLoading || stakingDataLoading ? (
             <UnlockActionsSkeleton />
           ) : (
             <UnlockActions
