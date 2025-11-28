@@ -26,11 +26,7 @@ interface UnlockActionsProps {
   error: string | null;
   onBeginUnlock: () => Promise<void>;
   onEndUnlock: () => Promise<void>;
-  onTransfer?: (
-    amountYocto: string,
-    receiverId?: string,
-    options?: { includeAllDust?: boolean },
-  ) => Promise<void>;
+  onTransfer?: (receiverId?: string) => Promise<void>;
   onDeleteLockup?: () => Promise<void>;
 }
 
@@ -69,8 +65,8 @@ export function UnlockActions({
 
   const hasFundsInPool = totalInPool.gt(0.01);
 
-  // Check if lockup can be deleted - requires EXACTLY zero balances (no dust allowed)
-  // The smart contract enforces strict zero balance, even for yoctoNEAR dust
+  // Check if lockup can be deleted - requires EXACTLY zero balances
+  // The smart contract enforces strict zero balance
   const hasAnyLockedBalance = Big(lockedBalance).gt(0);
   const hasAnyPendingBalance = Big(pendingBalance).gt(0);
   const hasAnyLiquidBalance = Big(liquidBalance || "0").gt(0);
@@ -106,8 +102,8 @@ export function UnlockActions({
     try {
       setActionError(null);
       setShowTransferConfirm(false);
-      // Transfer all liquid balance to user's wallet, including any dust
-      await onTransfer(liquidBalance || "0", undefined, { includeAllDust: true });
+      // Transfer all liquid balance to user's wallet
+      await onTransfer();
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Failed to transfer");
     }
@@ -129,8 +125,8 @@ export function UnlockActions({
         errorMessage.includes("panicked at lockup-contract")
       ) {
         setActionError(
-          "Deletion failed: Your lockup contract still has remaining balances (possibly dust amounts). " +
-            "Ensure all locked, pending, and liquid balances are exactly zero. Check the warnings above for guidance.",
+          "Deletion failed: Your lockup contract still has remaining balances. " +
+            "Ensure all locked, pending, and liquid balances are exactly zero. Use the action buttons above.",
         );
       } else {
         setActionError(errorMessage);
@@ -302,7 +298,7 @@ export function UnlockActions({
           </div>
         )}
 
-        {/* Dust Balance Warning - appears when balances are too small to display but block deletion */}
+        {/* Balance Warning - appears when balances exist but are too small to display with threshold */}
         {!canDeleteLockup &&
           !hasLocked &&
           !hasPending &&
@@ -314,29 +310,33 @@ export function UnlockActions({
               <AlertDescription>
                 <div className="space-y-2">
                   <p className="font-semibold text-amber-800 dark:text-amber-200">
-                    ⚠️ Dust Balance Detected
+                    ⚠️ Small Balance Detected
                   </p>
                   <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Your lockup contract has negligible dust amounts (less than 0.0001 NEAR) that
-                    prevent deletion. The smart contract requires EXACTLY zero balances.
+                    Your lockup contract has very small remaining balances that prevent deletion.
+                    The smart contract requires EXACTLY zero balances.
                   </p>
                   {hasAnyLockedBalance && (
                     <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
-                      Locked: {lockedBalance} yoctoNEAR - Use "Start Unlock" to begin unlock process
+                      Locked: {lockedBalance} yoctoNEAR - Use &quot;Start Unlock&quot; (unlocks ALL
+                      locked)
                     </p>
                   )}
                   {hasAnyPendingBalance && (
                     <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
-                      Pending: {pendingBalance} yoctoNEAR - Use "Complete Unlock" after 91.25 days
+                      Pending: {pendingBalance} yoctoNEAR - Use &quot;Complete Unlock&quot; after
+                      91.25 days (completes ALL pending)
                     </p>
                   )}
                   {hasAnyLiquidBalance && (
                     <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
-                      Liquid: {liquidBalance} yoctoNEAR - Use "Transfer" to move to your wallet
+                      Liquid: {liquidBalance} yoctoNEAR - Use &quot;Transfer&quot; (transfers ALL
+                      liquid)
                     </p>
                   )}
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                    To clean up dust, use the individual action buttons above in sequence.
+                    All action buttons automatically handle the complete balance - no dust left
+                    behind.
                   </p>
                 </div>
               </AlertDescription>

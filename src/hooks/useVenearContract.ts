@@ -24,22 +24,6 @@ const checkAccountExists = async (lockupId: string): Promise<boolean> => {
     .catch(() => false);
 };
 
-const formatNearAmount = (amount: string): string => {
-  try {
-    return Big(amount).div(Big(10).pow(24)).toFixed(4);
-  } catch {
-    return "0";
-  }
-};
-
-const parseNearAmount = (amount: string): string => {
-  try {
-    return Big(amount).mul(Big(10).pow(24)).toFixed(0);
-  } catch {
-    return "0";
-  }
-};
-
 export function useVenearContract() {
   const { selector, accountId, isTestMode, testAccount } = useWallet();
   const [balance, setBalance] = useState<VenearBalance>({
@@ -233,109 +217,84 @@ export function useVenearContract() {
     };
   }, [accountId, fetchBalances]);
 
-  const beginUnlock = useCallback(
-    async (amount?: string) => {
-      if (isTestMode) {
-        throw new Error("Transactions are disabled in test mode");
+  const beginUnlock = useCallback(async () => {
+    if (isTestMode) {
+      throw new Error("Transactions are disabled in test mode");
+    }
+
+    if (!selector || !accountId || !lockupAccountId)
+      throw new Error("Wallet not connected or lockup account not loaded");
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const wallet = await selector.wallet();
+
+      // Always unlock ALL locked balance by passing null
+      const args = { amount: null };
+
+      await wallet.signAndSendTransaction({
+        receiverId: lockupAccountId,
+        actions: [actionCreators.functionCall("begin_unlock_near", args, MAX_GAS, ONE_YOCTO_NEAR)],
+      });
+
+      setTimeout(() => fetchBalances(), 3000);
+    } catch (err: unknown) {
+      console.error("Unlock failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to initiate unlock");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [selector, accountId, lockupAccountId, fetchBalances, isTestMode]);
+
+  const endUnlock = useCallback(async () => {
+    if (isTestMode) {
+      throw new Error("Transactions are disabled in test mode");
+    }
+
+    if (!selector || !accountId || !lockupAccountId)
+      throw new Error("Wallet not connected or lockup account not loaded");
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const wallet = await selector.wallet();
+
+      // Always complete unlock for ALL pending balance by passing null
+      const args = { amount: null };
+
+      await wallet.signAndSendTransaction({
+        receiverId: lockupAccountId,
+        actions: [actionCreators.functionCall("end_unlock_near", args, MAX_GAS, ONE_YOCTO_NEAR)],
+      });
+
+      setTimeout(() => fetchBalances(), 3000);
+    } catch (err: unknown) {
+      console.error("End unlock failed:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // Enhanced error messages for common unlock completion failures
+      if (errorMessage.includes("timestamp") || errorMessage.includes("not ready")) {
+        setError("Unlock period not complete. Please wait until timer reaches zero.");
+      } else if (
+        errorMessage.includes("no pending balance") ||
+        errorMessage.includes("nothing to unlock")
+      ) {
+        setError("No pending balance to complete. Start unlock first.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to complete unlock");
       }
-
-      if (!selector || !accountId || !lockupAccountId)
-        throw new Error("Wallet not connected or lockup account not loaded");
-
-      if (amount) {
-        const amountNum = parseFloat(amount);
-        if (isNaN(amountNum) || amountNum <= 0) {
-          throw new Error("Invalid amount: must be a positive number");
-        }
-        const lockedNum = parseFloat(balance.locked);
-        if (amountNum > lockedNum) {
-          throw new Error(`Amount exceeds locked balance of ${balance.locked} NEAR`);
-        }
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const wallet = await selector.wallet();
-
-        const args = amount ? { amount: parseNearAmount(amount) } : { amount: null };
-
-        await wallet.signAndSendTransaction({
-          receiverId: lockupAccountId,
-          actions: [
-            actionCreators.functionCall("begin_unlock_near", args, MAX_GAS, ONE_YOCTO_NEAR),
-          ],
-        });
-
-        setTimeout(() => fetchBalances(), 3000);
-      } catch (err: unknown) {
-        console.error("Unlock failed:", err);
-        setError(err instanceof Error ? err.message : "Failed to initiate unlock");
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [selector, accountId, lockupAccountId, balance.locked, fetchBalances, isTestMode],
-  );
-
-  const endUnlock = useCallback(
-    async (amount?: string) => {
-      if (isTestMode) {
-        throw new Error("Transactions are disabled in test mode");
-      }
-
-      if (!selector || !accountId || !lockupAccountId)
-        throw new Error("Wallet not connected or lockup account not loaded");
-
-      if (amount) {
-        const amountNum = parseFloat(amount);
-        if (isNaN(amountNum) || amountNum <= 0) {
-          throw new Error("Invalid amount: must be a positive number");
-        }
-        const pendingNum = parseFloat(balance.pending);
-        if (amountNum > pendingNum) {
-          throw new Error(`Amount exceeds pending balance of ${balance.pending} NEAR`);
-        }
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const wallet = await selector.wallet();
-
-        const args = amount ? { amount: parseNearAmount(amount) } : { amount: null };
-
-        await wallet.signAndSendTransaction({
-          receiverId: lockupAccountId,
-          actions: [actionCreators.functionCall("end_unlock_near", args, MAX_GAS, ONE_YOCTO_NEAR)],
-        });
-
-        setTimeout(() => fetchBalances(), 3000);
-      } catch (err: unknown) {
-        console.error("End unlock failed:", err);
-        const errorMessage = err instanceof Error ? err.message : String(err);
-
-        // Enhanced error messages for common unlock completion failures
-        if (errorMessage.includes("timestamp") || errorMessage.includes("not ready")) {
-          setError("Unlock period not complete. Please wait until timer reaches zero.");
-        } else if (errorMessage.includes("no pending balance") || errorMessage.includes("nothing to unlock")) {
-          setError("No pending balance to complete. Start unlock first.");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to complete unlock");
-        }
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [selector, accountId, lockupAccountId, balance.pending, fetchBalances, isTestMode],
-  );
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [selector, accountId, lockupAccountId, fetchBalances, isTestMode]);
 
   const transferToAccount = useCallback(
-    async (amountYocto: string, receiverId?: string, options?: { includeAllDust?: boolean }) => {
+    async (receiverId?: string) => {
       if (isTestMode) {
         throw new Error("Transactions are disabled in test mode");
       }
@@ -347,7 +306,7 @@ export function useVenearContract() {
       setError(null);
 
       try {
-        // Fetch fresh balance before transfer to get exact amount
+        // Always fetch exact liquid balance from contract before transfer
         const provider = getSharedProvider();
         const liquidResult = await provider.query({
           request_type: "call_function",
@@ -356,41 +315,27 @@ export function useVenearContract() {
           method_name: "get_liquid_owners_balance",
           args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
         });
-        const actualLiquidBalance = JSON.parse(
+        const exactLiquidBalance = JSON.parse(
           Buffer.from((liquidResult as unknown as QueryResult).result).toString(),
         );
 
-        // Smart amount handling
-        let finalAmount = amountYocto;
-        const requestedBig = Big(amountYocto);
-        const actualBig = Big(actualLiquidBalance);
-
-        // If requesting all or very close to actual balance, use exact actual balance
-        if (options?.includeAllDust || requestedBig.minus(actualBig).abs().lte(1000)) {
-          finalAmount = actualLiquidBalance;
-        }
-
-        // Validate the final amount
-        const finalBig = Big(finalAmount);
-        if (finalBig.lte(0)) {
-          throw new Error("Invalid amount: must be greater than zero");
-        }
-        if (finalBig.gt(actualBig)) {
-          throw new Error(
-            `Amount ${formatNearAmount(finalAmount)} exceeds liquid balance of ${formatNearAmount(actualLiquidBalance)} NEAR`,
-          );
+        // Validate we have a balance to transfer
+        const balanceBig = Big(exactLiquidBalance);
+        if (balanceBig.lte(0)) {
+          throw new Error("No liquid balance available to transfer");
         }
 
         const recipient = receiverId || accountId;
         const wallet = await selector.wallet();
 
+        // Transfer exact liquid balance - no dust left behind
         await wallet.signAndSendTransaction({
           receiverId: lockupAccountId,
           actions: [
             actionCreators.functionCall(
               "transfer",
               {
-                amount: finalAmount,
+                amount: exactLiquidBalance,
                 receiver_id: recipient,
               },
               MAX_GAS,

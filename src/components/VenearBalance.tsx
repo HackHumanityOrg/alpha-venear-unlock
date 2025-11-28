@@ -140,9 +140,7 @@ export function VenearBalance({
           <div className="space-y-2">
             <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <span className="text-sm font-medium">Total in Contract</span>
-              <span className="font-mono text-sm">
-                {formatNearAmount(accountBalance)} NEAR
-              </span>
+              <span className="font-mono text-sm">{formatNearAmount(accountBalance)} NEAR</span>
             </div>
 
             {liquidBalance && Big(accountBalance).gt(liquidBalance) && (

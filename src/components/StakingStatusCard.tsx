@@ -98,24 +98,20 @@ export function StakingStatusCard({
           </a>
         </div>
 
-        {/* Liquid Staking Pool Warning */}
+        {/* Liquid Staking Pool Info */}
         {stakingInfo.isLiquidStakingPool && (
           <Alert
             variant="default"
-            className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900"
+            className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900"
           >
             <AlertDescription>
               <div className="space-y-2">
-                <p className="font-semibold text-amber-800 dark:text-amber-200">
-                  ⚠️ Liquid Staking Pool Detected
+                <p className="font-semibold text-blue-800 dark:text-blue-200">
+                  ℹ️ Liquid Staking Pool Detected
                 </p>
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  This is a liquid staking pool. When you unstake and withdraw, share-to-NEAR
-                  conversion will create dust amounts due to rounding.
-                </p>
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                  ⚠️ This dust cannot be avoided and may prevent lockup contract deletion. You may
-                  need to repeat the unlock cycle (91.25 days) multiple times to clean up dust.
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  This is a liquid staking pool (Meta Pool or LiNEAR). Withdrawals use share-to-NEAR
+                  conversion.
                 </p>
               </div>
             </AlertDescription>
