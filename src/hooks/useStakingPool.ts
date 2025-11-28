@@ -5,7 +5,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { actionCreators } from "@near-js/transactions";
 import Big from "big.js";
 import { MAX_GAS, ONE_YOCTO_NEAR } from "@/lib/constants";
-import { fetchStakingPoolInfo } from "@/lib/stakingPoolUtils";
+import { fetchStakingPoolInfo, detectLiquidStakingPool } from "@/lib/stakingPoolUtils";
 import type { StakingPoolInfo } from "@/types/venear";
 
 export function useStakingPool(lockupAccountId: string | null) {
@@ -28,7 +28,17 @@ export function useStakingPool(lockupAccountId: string | null) {
 
         if (signal?.aborted) return;
 
-        setStakingInfo(info);
+        // Detect if this is a liquid staking pool
+        const isLiquidStakingPool = detectLiquidStakingPool(info?.stakingPoolId || null);
+
+        setStakingInfo(
+          info
+            ? {
+                ...info,
+                isLiquidStakingPool,
+              }
+            : null,
+        );
         setError(null);
         setDataLoading(false);
       } catch (err) {

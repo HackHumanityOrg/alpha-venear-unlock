@@ -316,13 +316,15 @@ export function useVenearContract() {
         setTimeout(() => fetchBalances(), 3000);
       } catch (err: unknown) {
         console.error("End unlock failed:", err);
-        const errorMessage = err instanceof Error ? err.message : "Failed to complete unlock";
+        const errorMessage = err instanceof Error ? err.message : String(err);
 
-        // Enhanced error messages
+        // Enhanced error messages for common unlock completion failures
         if (errorMessage.includes("timestamp") || errorMessage.includes("not ready")) {
-          setError("Unlock period not yet complete. Please wait until the timer reaches zero.");
+          setError("Unlock period not complete. Please wait until timer reaches zero.");
+        } else if (errorMessage.includes("no pending balance") || errorMessage.includes("nothing to unlock")) {
+          setError("No pending balance to complete. Start unlock first.");
         } else {
-          setError(errorMessage);
+          setError(err instanceof Error ? err.message : "Failed to complete unlock");
         }
         throw err;
       } finally {
@@ -441,97 +443,24 @@ export function useVenearContract() {
       }, 3000);
     } catch (err: unknown) {
       console.error("Delete lockup failed:", err);
-      setError(err instanceof Error ? err.message : "Failed to delete lockup contract");
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // Enhanced error messages for common deletion failures
+      if (errorMessage.includes("non-zero") || errorMessage.includes("balance")) {
+        setError(
+          "Cannot delete: Lockup still has balances. All locked, pending, and liquid " +
+            "balances must be exactly zero. You may have microscopic dust - check yoctoNEAR amounts.",
+        );
+      } else if (errorMessage.includes("staked")) {
+        setError("Cannot delete: Funds still in staking pool. Unstake and withdraw first.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to delete lockup contract");
+      }
       throw err;
     } finally {
       setLoading(false);
     }
   }, [selector, accountId, lockupAccountId, isTestMode]);
-
-  const detectDust = useCallback(() => {
-    const lockedBig = Big(balance.locked || "0");
-    const pendingBig = Big(balance.pending || "0");
-    const liquidBig = Big(balance.liquid || "0");
-
-    return {
-      hasLockedDust: lockedBig.gt(0) && lockedBig.lt(Big(10).pow(20)),
-      hasPendingDust: pendingBig.gt(0) && pendingBig.lt(Big(10).pow(20)),
-      hasLiquidDust: liquidBig.gt(0) && liquidBig.lt(Big(10).pow(20)),
-      lockedAmount: balance.locked || "0",
-      pendingAmount: balance.pending || "0",
-      liquidAmount: balance.liquid || "0",
-    };
-  }, [balance]);
-
-  const cleanupDustBalances = useCallback(
-    async (unlockTimestamp: string | null) => {
-      if (isTestMode) {
-        throw new Error("Transactions are disabled in test mode");
-      }
-
-      if (!selector || !accountId || !lockupAccountId)
-        throw new Error("Wallet not connected or lockup account not loaded");
-
-      const dust = detectDust();
-      const operations: Array<() => Promise<void>> = [];
-
-      // Step 1: Unlock any locked dust
-      if (dust.hasLockedDust || Big(balance.locked).gt(0)) {
-        operations.push(async () => {
-          console.log("Cleaning up locked dust:", balance.locked);
-          await beginUnlock(); // Passing no amount = unlock all
-        });
-      }
-
-      // Step 2: Complete unlock for pending dust (if unlock period is done)
-      if ((dust.hasPendingDust || Big(balance.pending).gt(0)) && unlockTimestamp) {
-        const isReady = parseInt(unlockTimestamp) <= Date.now() * 1000000;
-        if (isReady) {
-          operations.push(async () => {
-            console.log("Completing unlock for pending dust:", balance.pending);
-            await endUnlock(); // Passing no amount = unlock all
-          });
-        }
-      }
-
-      // Step 3: Transfer any liquid dust
-      if (dust.hasLiquidDust || Big(balance.liquid || "0").gt(0)) {
-        operations.push(async () => {
-          console.log("Transferring liquid dust:", balance.liquid);
-          await transferToAccount(balance.liquid || "0", undefined, { includeAllDust: true });
-        });
-      }
-
-      // Execute operations sequentially
-      for (const operation of operations) {
-        try {
-          await operation();
-          // Wait a bit for transaction to process
-          await new Promise((resolve) => setTimeout(resolve, 4000));
-          // Refresh balances after each step
-          await fetchBalances();
-        } catch (err) {
-          console.error("Cleanup operation failed:", err);
-          throw err;
-        }
-      }
-
-      // Final balance refresh
-      await fetchBalances();
-    },
-    [
-      isTestMode,
-      selector,
-      accountId,
-      lockupAccountId,
-      detectDust,
-      balance,
-      beginUnlock,
-      endUnlock,
-      transferToAccount,
-      fetchBalances,
-    ],
-  );
 
   return {
     lockedBalance: balance.locked,
@@ -548,7 +477,6 @@ export function useVenearContract() {
     endUnlock,
     transferToAccount,
     deleteLockup,
-    cleanupDustBalances,
     refreshBalances: fetchBalances,
   };
 }

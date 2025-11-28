@@ -32,7 +32,6 @@ interface UnlockActionsProps {
     options?: { includeAllDust?: boolean },
   ) => Promise<void>;
   onDeleteLockup?: () => Promise<void>;
-  onCleanupDust?: (unlockTimestamp: string | null) => Promise<void>;
 }
 
 export function UnlockActions({
@@ -47,13 +46,11 @@ export function UnlockActions({
   onEndUnlock,
   onTransfer,
   onDeleteLockup,
-  onCleanupDust,
 }: UnlockActionsProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [cleanupInProgress, setCleanupInProgress] = useState(false);
 
   const threshold = Big(10).pow(20);
   const hasLocked = Big(lockedBalance).gt(threshold);
@@ -138,19 +135,6 @@ export function UnlockActions({
       } else {
         setActionError(errorMessage);
       }
-    }
-  };
-
-  const handleCleanupDust = async () => {
-    if (!onCleanupDust) return;
-    try {
-      setActionError(null);
-      setCleanupInProgress(true);
-      await onCleanupDust(unlockTimestamp);
-    } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Failed to clean up dust");
-    } finally {
-      setCleanupInProgress(false);
     }
   };
 
@@ -338,34 +322,22 @@ export function UnlockActions({
                   </p>
                   {hasAnyLockedBalance && (
                     <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
-                      Locked: {lockedBalance} yoctoNEAR
+                      Locked: {lockedBalance} yoctoNEAR - Use "Start Unlock" to begin unlock process
                     </p>
                   )}
                   {hasAnyPendingBalance && (
                     <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
-                      Pending: {pendingBalance} yoctoNEAR
+                      Pending: {pendingBalance} yoctoNEAR - Use "Complete Unlock" after 91.25 days
                     </p>
                   )}
                   {hasAnyLiquidBalance && (
                     <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
-                      Liquid: {liquidBalance} yoctoNEAR
+                      Liquid: {liquidBalance} yoctoNEAR - Use "Transfer" to move to your wallet
                     </p>
                   )}
-
-                  {onCleanupDust && (
-                    <div className="mt-4">
-                      <Button
-                        onClick={handleCleanupDust}
-                        disabled={loading || cleanupInProgress}
-                        className="w-full bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600"
-                        size="sm"
-                      >
-                        {cleanupInProgress
-                          ? "Cleaning Up Dust..."
-                          : "Automatically Clean Up All Dust"}
-                      </Button>
-                    </div>
-                  )}
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                    To clean up dust, use the individual action buttons above in sequence.
+                  </p>
                 </div>
               </AlertDescription>
             </Alert>

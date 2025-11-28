@@ -10,18 +10,24 @@ import { StakingStatusCard } from "@/components/StakingStatusCard";
 import { StakingStatusCardSkeleton } from "@/components/StakingStatusCardSkeleton";
 import { UnlockActions } from "@/components/UnlockActions";
 import { UnlockActionsSkeleton } from "@/components/UnlockActionsSkeleton";
-import { TestAccountSelector } from "@/components/TestAccountSelector";
+import { TestAccountSelectorClient } from "@/components/TestAccountSelector";
+import type { TestAccount } from "@/lib/testAccounts";
 
 /**
  * Client-side content for the main page
  * Handles wallet connection and user-specific veNEAR interactions
  */
-export function ClientPageContent() {
+interface ClientPageContentProps {
+  testAccounts: TestAccount[];
+}
+
+export function ClientPageContent({ testAccounts }: ClientPageContentProps) {
   const { accountId } = useWallet();
   const {
     lockedBalance,
     pendingBalance,
     liquidBalance,
+    accountBalance,
     unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
@@ -32,7 +38,6 @@ export function ClientPageContent() {
     endUnlock,
     transferToAccount,
     deleteLockup,
-    cleanupDustBalances,
   } = useVenearContract();
 
   const {
@@ -46,7 +51,7 @@ export function ClientPageContent() {
 
   return (
     <div className="space-y-6">
-      <TestAccountSelector />
+      <TestAccountSelectorClient testAccounts={testAccounts} />
       <WalletConnection />
 
       {accountId && (
@@ -58,6 +63,7 @@ export function ClientPageContent() {
               lockedBalance={lockedBalance}
               pendingBalance={pendingBalance}
               liquidBalance={liquidBalance}
+              accountBalance={accountBalance}
               unlockTimestamp={unlockTimestamp}
               lockupAccountId={lockupAccountId}
               lockupNotCreated={lockupNotCreated}
@@ -92,7 +98,6 @@ export function ClientPageContent() {
               onEndUnlock={endUnlock}
               onTransfer={transferToAccount}
               onDeleteLockup={deleteLockup}
-              onCleanupDust={cleanupDustBalances}
             />
           )}
         </>

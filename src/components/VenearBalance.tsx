@@ -18,6 +18,7 @@ interface VenearBalanceProps {
   lockedBalance: string;
   pendingBalance: string;
   liquidBalance?: string;
+  accountBalance?: string;
   unlockTimestamp: string | null;
   lockupAccountId: string | null;
   lockupNotCreated?: boolean;
@@ -28,6 +29,7 @@ export function VenearBalance({
   lockedBalance,
   pendingBalance,
   liquidBalance,
+  accountBalance,
   unlockTimestamp,
   lockupAccountId,
   lockupNotCreated,
@@ -131,6 +133,32 @@ export function VenearBalance({
             <p className="text-xs text-green-600 dark:text-green-400">
               ✓ Available to transfer to your wallet
             </p>
+          </div>
+        )}
+
+        {accountBalance && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <span className="text-sm font-medium">Total in Contract</span>
+              <span className="font-mono text-sm">
+                {formatNearAmount(accountBalance)} NEAR
+              </span>
+            </div>
+
+            {liquidBalance && Big(accountBalance).gt(liquidBalance) && (
+              <div className="ml-6 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                <div className="flex justify-between">
+                  <span>├─ Liquid (transferable):</span>
+                  <span className="font-mono">{formatNearAmount(liquidBalance)} NEAR</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>└─ Storage deposit:</span>
+                  <span className="font-mono">
+                    {formatNearAmount(Big(accountBalance).minus(liquidBalance).toString())} NEAR
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

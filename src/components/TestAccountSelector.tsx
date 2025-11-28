@@ -4,9 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useWallet } from "@/contexts/WalletContext";
-import { TEST_ACCOUNTS } from "@/lib/testAccounts";
+import type { TestAccount } from "@/lib/testAccounts";
 
-export function TestAccountSelector() {
+interface TestAccountSelectorClientProps {
+  testAccounts: TestAccount[];
+}
+
+export function TestAccountSelectorClient({ testAccounts }: TestAccountSelectorClientProps) {
   const { isTestMode, testAccount, setTestAccount, accountId } = useWallet();
 
   // Hide test mode in production
@@ -35,7 +39,7 @@ export function TestAccountSelector() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {TEST_ACCOUNTS.map((account) => (
+        {testAccounts.map((account) => (
           <Button
             key={account.accountId}
             onClick={() => setTestAccount(account)}

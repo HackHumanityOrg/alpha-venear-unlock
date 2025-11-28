@@ -7,6 +7,35 @@ interface QueryResult {
 }
 
 /**
+ * Detects if a staking pool is a liquid staking pool (Meta Pool/stNEAR or LiNEAR)
+ * These pools use share-based accounting which creates unavoidable dust during conversions
+ */
+export function detectLiquidStakingPool(stakingPoolId: string | null): boolean {
+  if (!stakingPoolId) return false;
+
+  // Meta Pool (stNEAR) detection
+  if (
+    stakingPoolId.includes("meta-pool") ||
+    stakingPoolId === "meta-v2.pool.near" ||
+    stakingPoolId.includes("meta-pool.near")
+  ) {
+    return true;
+  }
+
+  // LiNEAR Protocol detection
+  if (
+    stakingPoolId.includes("linear") ||
+    stakingPoolId === "v2-nearx.stader-labs.near" ||
+    stakingPoolId.includes("linear-protocol")
+  ) {
+    return true;
+  }
+
+  // Regular validator pool - no dust issues
+  return false;
+}
+
+/**
  * Fetches staking pool information for a given lockup account
  * @param lockupAccountId The lockup contract address
  * @returns StakingPoolInfo or null if no staking pool exists

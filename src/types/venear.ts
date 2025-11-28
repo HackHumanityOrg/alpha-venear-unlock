@@ -13,6 +13,8 @@ export interface StakingPoolInfo {
   availableBalance?: string;
   canWithdraw: boolean;
   isUnstaking: boolean;
+  // Liquid staking pool detection
+  isLiquidStakingPool?: boolean;
 }
 
 export type StakingStatus = "not_staked" | "staked" | "unstaking" | "unstaked" | "unknown";

@@ -4,8 +4,11 @@ import { PublicAccountsList } from "@/components/PublicAccountsList";
 import { PublicAccountsListSkeleton } from "@/components/PublicAccountsListSkeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ClientPageContent } from "@/components/ClientPageContent";
+import { getTestAccounts } from "@/lib/testAccounts";
 
-function AppContent() {
+async function AppContent() {
+  // Fetch test accounts at build time
+  const testAccounts = await getTestAccounts();
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="container max-w-7xl mx-auto space-y-6">
@@ -25,7 +28,7 @@ function AppContent() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <ClientPageContent />
+          <ClientPageContent testAccounts={testAccounts} />
 
           <div className="min-h-screen">
             <Suspense fallback={<PublicAccountsListSkeleton />}>
