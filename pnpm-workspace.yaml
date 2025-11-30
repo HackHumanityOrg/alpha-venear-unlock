@@ -1,0 +1,4 @@
+onlyBuiltDependencies:
+  - esbuild
+  - near-sandbox
+  - near-workspaces
