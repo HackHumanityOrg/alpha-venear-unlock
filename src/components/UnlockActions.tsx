@@ -334,10 +334,6 @@ export function UnlockActions({
                       liquid)
                     </p>
                   )}
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                    All action buttons automatically handle the complete balance - no dust left
-                    behind.
-                  </p>
                 </div>
               </AlertDescription>
             </Alert>

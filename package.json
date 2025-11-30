@@ -9,7 +9,10 @@
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:contract": "ava tests/lockup-mainnet-fork.test.ts --verbose"
+    "test:contract": "ava 'tests/accounts/**/*.test.ts' --verbose",
+    "test:simple": "ava 'tests/accounts/!(407|agoraeng2|agoraeng3|agoraeng5|agoraeng6|agoraeng7|aiml|alan777|alansicairos|atomauro1|grmsn|mob|natcrypto|phasfernandes|q8i|root|vote.mob).test.ts' --verbose",
+    "test:staking": "ava 'tests/accounts/@(407|agoraeng2|agoraeng3|agoraeng5|agoraeng6|agoraeng7|aiml|alan777|alansicairos|atomauro1|grmsn|mob|natcrypto|phasfernandes|q8i|root|vote.mob).test.ts' --verbose",
+    "test:all": "mkdir -p tests/reports && ava 'tests/accounts/**/*.test.ts' --verbose > tests/reports/test-report-$(date +%Y%m%d-%H%M%S).txt 2>&1"
   },
   "dependencies": {
     "@near-js/transactions": "^2.5.1",
@@ -60,6 +63,7 @@
     "nodeArguments": [
       "--import=tsx"
     ],
-    "timeout": "5m"
+    "timeout": "5m",
+    "workerThreads": false
   }
 }
