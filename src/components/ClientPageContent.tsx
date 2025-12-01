@@ -27,7 +27,6 @@ export function ClientPageContent({ testAccounts }: ClientPageContentProps) {
     lockedBalance,
     pendingBalance,
     liquidBalance,
-    accountBalance,
     unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
@@ -63,7 +62,6 @@ export function ClientPageContent({ testAccounts }: ClientPageContentProps) {
               lockedBalance={lockedBalance}
               pendingBalance={pendingBalance}
               liquidBalance={liquidBalance}
-              accountBalance={accountBalance}
               unlockTimestamp={unlockTimestamp}
               lockupAccountId={lockupAccountId}
               lockupNotCreated={lockupNotCreated}

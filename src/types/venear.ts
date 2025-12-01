@@ -3,7 +3,6 @@ export interface VenearBalance {
   pending: string;
   unlockTimestamp: string | null;
   liquid?: string;
-  accountBalance?: string;
 }
 
 export interface StakingPoolInfo {

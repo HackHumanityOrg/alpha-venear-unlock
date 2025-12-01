@@ -31,7 +31,6 @@ export function useVenearContract() {
     pending: "0",
     unlockTimestamp: null,
     liquid: "0",
-    accountBalance: "0",
   });
   const [dataLoading, setDataLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -99,7 +98,7 @@ export function useVenearContract() {
 
         const provider = getSharedProvider();
 
-        const [lockedResult, pendingResult, timestampResult, liquidResult, accountBalanceResult] =
+        const [lockedResult, pendingResult, timestampResult, trueLiquidResult] =
           await Promise.allSettled([
             provider.query({
               request_type: "call_function",
@@ -126,14 +125,7 @@ export function useVenearContract() {
               request_type: "call_function",
               finality: "final",
               account_id: lockupAccountId,
-              method_name: "get_liquid_owners_balance",
-              args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
-            }),
-            provider.query({
-              request_type: "call_function",
-              finality: "final",
-              account_id: lockupAccountId,
-              method_name: "get_account_balance",
+              method_name: "get_venear_liquid_balance",
               args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
             }),
           ]);
@@ -162,18 +154,9 @@ export function useVenearContract() {
             : null;
 
         const liquid =
-          liquidResult.status === "fulfilled"
+          trueLiquidResult.status === "fulfilled"
             ? JSON.parse(
-                Buffer.from((liquidResult.value as unknown as QueryResult).result).toString(),
-              )
-            : "0";
-
-        const accountBalance =
-          accountBalanceResult.status === "fulfilled"
-            ? JSON.parse(
-                Buffer.from(
-                  (accountBalanceResult.value as unknown as QueryResult).result,
-                ).toString(),
+                Buffer.from((trueLiquidResult.value as unknown as QueryResult).result).toString(),
               )
             : "0";
 
@@ -184,7 +167,6 @@ export function useVenearContract() {
           pending,
           unlockTimestamp: timestamp,
           liquid,
-          accountBalance,
         });
 
         setError(null);
@@ -307,12 +289,13 @@ export function useVenearContract() {
 
       try {
         // Always fetch exact liquid balance from contract before transfer
+        // (account + staked - locked - pending)
         const provider = getSharedProvider();
         const liquidResult = await provider.query({
           request_type: "call_function",
           finality: "final",
           account_id: lockupAccountId,
-          method_name: "get_liquid_owners_balance",
+          method_name: "get_venear_liquid_balance",
           args_base64: Buffer.from(JSON.stringify({})).toString("base64"),
         });
         const exactLiquidBalance = JSON.parse(
@@ -383,7 +366,6 @@ export function useVenearContract() {
           pending: "0",
           unlockTimestamp: null,
           liquid: "0",
-          accountBalance: "0",
         });
       }, 3000);
     } catch (err: unknown) {
@@ -411,7 +393,6 @@ export function useVenearContract() {
     lockedBalance: balance.locked,
     pendingBalance: balance.pending,
     liquidBalance: balance.liquid || "0",
-    accountBalance: balance.accountBalance || "0",
     unlockTimestamp: balance.unlockTimestamp,
     lockupAccountId,
     lockupNotCreated,
