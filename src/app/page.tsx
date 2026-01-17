@@ -12,14 +12,6 @@ async function AppContent() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="container max-w-7xl mx-auto space-y-6">
-        {/* Beta Banner */}
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 text-center">
-          <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-            This application is currently under beta testing. Please use with caution and verify all
-            transactions.
-          </p>
-        </div>
-
         <div className="text-center space-y-2 py-4">
           <h1 className="text-4xl font-bold">veNEAR Unlock</h1>
           <p className="text-muted-foreground">
